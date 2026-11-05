@@ -13,40 +13,62 @@ Copyright (c) 2026 geekAmis. All rights reserved. / Все права защищ
 1. РАЗРЕШЁННОЕ ИСПОЛЬЗОВАНИЕ
    1.1. Вам разрешено запускать собранную игру для личного, некоммерческого
         использования.
-   1.2. Вам разрешено создавать и распространять бесплатные моды к игре
-        (далее — «Моды») исключительно как отдельные файлы-надстройки,
-        не содержащие и не заменяющие основные файлы Проекта.
-   1.3. Моды должны размещаться в отдельной папке mods/<имя_мода>/data/
-        или в пользовательской папке mods и подключаться штатным загрузчиком
-        Проекта. Мод не должен изменять, удалять, переименовывать или
-        подменять основные файлы.
+   1.2. Вам разрешено создавать и распространять бесплатные моды и дополнения
+        (далее — «Моды») двумя способами:
+        а) как оверлеи данных — отдельные JSON-файлы в mods/<имя>/data/;
+        б) как аддитивные файлы — новые скрипты, сцены, ассеты, UI-модули,
+           локализация и другие новые файлы, которые не заменяют и не изменяют
+           существующие файлы Проекта.
+   1.3. Вам разрешено добавлять в Проект новые файлы и реализовывать в них
+        новые функции при условиях:
+        - ни один существующий файл Проекта не изменён, не удалён,
+          не переименован и не перезаписан;
+        - новые файлы имеют уникальные имена и не маскируются под основные;
+        - Мод не требует изменения основных файлов для запуска;
+        - после удаления Мода базовая игра остаётся работоспособной.
+   1.4. Поддерживаемое расположение аддитивных Модов:
+        mods/<имя_мода>/ (в проекте, рядом с Aetheria.exe или в user://mods).
+        Точка входа скрипта — mod.gd; данные — data/*.json.
+   1.5. Моды можно распространять бесплатно, если они не содержат основных
+        файлов Проекта и не выдают себя за официальный контент.
 
 2. ЗАПРЕЩЁННЫЕ ДЕЙСТВИЯ
-   2.1. Запрещается модернизация, изменение, удаление, переименование,
-        рефакторинг, декомпиляция, дизассемблирование, патчинг, обход
-        защиты и любое иное вмешательство в основные файлы Проекта,
-        включая game/scripts/**, game/scenes/**, game/data/**,
-        game/assets/**, game/project.godot, build/** и docs/**.
-   2.2. Запрещается распространять, публиковать, продавать, сдавать в аренду,
+   2.1. Запрещается изменять, удалять, переименовывать, перезаписывать,
+        патчить, декомпилировать, дизассемблировать или иным образом
+        вмешиваться в существующие основные файлы Проекта, включая
+        game/scripts/**, game/scenes/**, game/data/**, game/assets/**,
+        game/project.godot, build/** и docs/**.
+   2.2. Запрещается подменять основные файлы Модом, внедрять код в ядро,
+        модифицировать runtime-бинарник или обходить защиту.
+   2.3. Запрещается критически ломать сборку Модом, в том числе:
+        - делать базовую игру неспособной запуститься без Мода;
+        - повреждать или делать несовместимыми сохранения базовой игры;
+        - отключать критические проверки безопасности;
+        - создавать бесконечный цикл/падение при старте базовой игры;
+        - требовать модификации ядра для работы Мода.
+        Мод, вызывающий ошибки, должен быть исправлен или удалён автором Мода.
+   2.4. Запрещается распространять, публиковать, продавать, сдавать в аренду,
         сублицензировать или иным образом передавать основные файлы Проекта
         либо их изменённые версии.
-   2.3. Запрещается включать основные файлы Проекта в другие продукты,
-        сборники, моды, архивы или сервисы.
-   2.4. Запрещается удалять или скрывать уведомления об авторских правах,
+   2.5. Запрещается включать основные файлы Проекта в другие продукты,
+        сборники, Моды, архивы или сервисы.
+   2.6. Запрещается удалять или скрывать уведомления об авторских правах,
         названии Проекта и лицензии.
-   2.5. Запрещается использовать название, логотип, домен, аккаунты или
+   2.7. Запрещается использовать название, логотип, домен, аккаунты или
         оформление Проекта, чтобы выдать себя за автора, правообладателя
         или официальный канал Проекта.
-   2.6. Запрещается коммерческое использование Проекта и его частей без
+   2.8. Запрещается коммерческое использование Проекта и его частей без
         отдельного письменного разрешения правообладателя.
 
 3. МОДЫ
-   3.1. Мод является самостоятельным произведением его автора и не должен
-        содержать код, данные или ассеты основных файлов Проекта.
-   3.2. Автор мода не вправе заявлять, что мод является официальной частью
+   3.1. Аддитивный Мод является самостоятельным произведением его автора.
+        Его код, данные и ассеты не становятся частью ядра Проекта.
+   3.2. Автор Мода не вправе заявлять, что Мод является официальной частью
         Проекта, если на это нет письменного разрешения правообладателя.
    3.3. Правообладатель не гарантирует совместимость Модов с будущими
         версиями и не несёт ответственности за ущерб, вызванный Модами.
+   3.4. Если Мод содержит новые функции, он должен быть спроектирован так,
+        чтобы базовая игра без него оставалась работоспособной.
 
 4. СТОРОННИЕ КОМПОНЕНТЫ
    4.1. Godot Engine распространяется по лицензии MIT.
@@ -73,36 +95,57 @@ game/THIRD_PARTY.md.
 
 1. PERMITTED USE
    1.1. You may run the compiled game for personal, non-commercial use.
-   1.2. You may create and distribute free mods solely as separate overlay
-        files that do not contain or replace the Project's core files.
-   1.3. Mods must live in a separate mods/<mod_name>/data/ directory (or the
-        user mods directory) and be loaded through the Project's official
-        loader. A mod must not modify, delete, rename or substitute core files.
+   1.2. You may create and distribute free mods and add-ons in two forms:
+        (a) data overlays — separate JSON files in mods/<name>/data/;
+        (b) additive files — new scripts, scenes, assets, UI modules,
+            localization and other new files that do not replace or modify
+            existing Project files.
+   1.3. You may add new files to the Project and implement new features in
+        them, provided that:
+        - no existing Project file is modified, deleted, renamed or overwritten;
+        - new files use unique names and do not masquerade as core files;
+        - the mod does not require modifying core files to run;
+        - the base game remains functional after the mod is removed.
+   1.4. The supported location for additive mods is mods/<mod_name>/ (inside
+        the project, next to Aetheria.exe, or in user://mods). The script
+        entry point is mod.gd; data files go in data/*.json.
+   1.5. Mods may be distributed free of charge if they do not contain Project
+        core files and do not impersonate official content.
 
 2. PROHIBITED ACTIONS
-   2.1. You may not modernize, modify, delete, rename, refactor, decompile,
-        disassemble, patch, bypass protections in, or otherwise interfere
-        with the core files, including game/scripts/**, game/scenes/**,
-        game/data/**, game/assets/**, game/project.godot, build/** and
-        docs/**.
-   2.2. You may not distribute, publish, sell, rent, sublicense or otherwise
+   2.1. You may not modify, delete, rename, overwrite, patch, decompile,
+        disassemble or otherwise interfere with existing core files, including
+        game/scripts/**, game/scenes/**, game/data/**, game/assets/**,
+        game/project.godot, build/** and docs/**.
+   2.2. You may not substitute core files with a mod, inject code into the
+        core, modify the runtime binary or bypass protections.
+   2.3. You may not critically break the build with a mod, including:
+        - making the base game unable to launch without the mod;
+        - corrupting or making base-game saves incompatible;
+        - disabling critical security checks;
+        - creating an infinite loop/crash on base-game startup;
+        - requiring core modifications for the mod to work.
+        A mod that causes such errors must be fixed or removed by its author.
+   2.4. You may not distribute, publish, sell, rent, sublicense or otherwise
         transfer the core files or any modified versions.
-   2.3. You may not include the core files in other products, compilations,
+   2.5. You may not include the core files in other products, compilations,
         mods, archives or services.
-   2.4. You may not remove or obscure copyright, project name or license
+   2.6. You may not remove or obscure copyright, project name or license
         notices.
-   2.5. You may not use the Project's name, logo, domain, accounts or visual
+   2.7. You may not use the Project's name, logo, domain, accounts or visual
         identity to impersonate the author, rights holder or official channel.
-   2.6. Commercial use of the Project or its parts requires prior written
+   2.8. Commercial use of the Project or its parts requires prior written
         permission from the rights holder.
 
 3. MODS
-   3.1. A mod is the independent work of its author and must not contain code,
-        data or assets from the Project's core files.
+   3.1. An additive mod is the independent work of its author. Its code, data
+        and assets do not become part of the Project core.
    3.2. A mod author may not claim that a mod is an official part of the
         Project without written permission.
    3.3. The rights holder does not guarantee mod compatibility with future
         versions and is not liable for damage caused by mods.
+   3.4. A mod that adds features must be designed so that the base game remains
+        functional without it.
 
 4. THIRD-PARTY COMPONENTS
    4.1. Godot Engine is licensed under MIT.

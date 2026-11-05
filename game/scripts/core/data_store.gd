@@ -112,6 +112,10 @@ func _load(path: String) -> Array:
 
 # ------------------------------------------------------------------ mods
 
+func mod_roots() -> Array:
+	return _mod_roots()
+
+
 func _mod_roots() -> Array:
 	var roots: Array = ["res://mods", "user://mods"]
 	var exe_dir := OS.get_executable_path().get_base_dir()

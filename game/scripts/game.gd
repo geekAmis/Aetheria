@@ -51,6 +51,7 @@ var redo_stack: Array = []
 var tutorial_flags := {"select": false, "mountain": false, "lightning": false, "speed": false}
 var tutorial_done := false
 var world_lost_shown := false
+var mods_initialized := false
 
 
 func new_game(p_config: Dictionary, progress: Callable = Callable()) -> void:
@@ -226,6 +227,9 @@ func _create_hud() -> void:
 	hud.update_essence(essence, sandbox)
 	hud.set_brush(brush_radius)
 	hud.update_tutorial(tutorial_flags, tutorial_done)
+	if not mods_initialized:
+		mods_initialized = true
+		ModLoader.load_for_game(self)
 
 
 func reload_hud() -> void:
