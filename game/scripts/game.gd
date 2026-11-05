@@ -193,8 +193,9 @@ func _after_sim() -> void:
 	settlement_view.setup(world, sim, camera_rig)
 	creature_view.setup(world, sim)
 	fx.setup(world, sim, camera_rig)
-	nature_view.mark_dirty()
-	sim.settlement_founded.connect(func(_s): nature_view.mark_dirty())
+	for s in sim.settlements:
+		nature_view.mark_dirty_rect(_nature_rect(s.center))
+	sim.settlement_founded.connect(func(s): nature_view.mark_dirty_rect(_nature_rect(s.center)))
 	fx.screen_flash.connect(_on_screen_flash)
 	fx.screen_shake.connect(func(a, d): camera_rig.add_shake(a, d))
 	sim.chronicle_added.connect(_on_chronicle_event)
@@ -376,6 +377,10 @@ func _world_era() -> int:
 
 func _alive_settlements() -> int:
 	return sim._alive_settlement_count()
+
+
+func _nature_rect(center: Vector2i, radius: int = 13) -> Rect2i:
+	return Rect2i(center.x - radius, center.y - radius, radius * 2, radius * 2)
 
 
 func _update_brush_cursor() -> void:
@@ -852,7 +857,7 @@ func _apply_snapshot(snap: Dictionary) -> void:
 			k += 1
 	world._recount()
 	terrain_view.rebuild_rect(rect)
-	nature_view.mark_dirty()
+	nature_view.mark_dirty_rect(rect)
 	terrain_view.minimap_dirty = true
 
 
