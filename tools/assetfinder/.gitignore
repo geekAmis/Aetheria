@@ -1,0 +1,7 @@
+# Загрузки и кэш Python
+downloads/
+downloads_*/
+__pycache__/
+*.pyc
+geckodriver.log
+cookies.txt

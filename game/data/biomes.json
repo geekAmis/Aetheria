@@ -1,0 +1,478 @@
+[
+ {
+  "id": "ocean",
+  "name": "Океан",
+  "name_en": "Ocean",
+  "color": "#145a9e",
+  "accent": "#2b7fc4",
+  "fertility": 0.05,
+  "move": 9.0,
+  "tree": "none",
+  "tree_density": 0.0,
+  "rock": 0.0,
+  "animals": [
+   "fish",
+   "whale"
+  ],
+  "races": [],
+  "desc": "Глубокие воды. Здесь рождаются шторма и отсюда приходят цунами.",
+  "desc_en": "Deep waters. Storms are born here, and tsunamis come from here."
+ },
+ {
+  "id": "shallow",
+  "name": "Отмель",
+  "name_en": "Shallows",
+  "color": "#3da8d6",
+  "accent": "#8fe3f2",
+  "fertility": 0.35,
+  "move": 5.0,
+  "tree": "none",
+  "tree_density": 0.0,
+  "rock": 0.0,
+  "animals": [
+   "fish",
+   "crab"
+  ],
+  "races": [],
+  "desc": "Тёплая прибрежная вода, богатая рыбой.",
+  "desc_en": "Warm coastal water, rich in fish."
+ },
+ {
+  "id": "reef",
+  "name": "Коралловый риф",
+  "name_en": "Coral Reef",
+  "color": "#22b8b8",
+  "accent": "#ff9ecb",
+  "fertility": 0.6,
+  "move": 5.0,
+  "tree": "none",
+  "tree_density": 0.0,
+  "rock": 0.0,
+  "animals": [
+   "fish",
+   "crab"
+  ],
+  "races": [],
+  "desc": "Живой лабиринт из кораллов — рай для рыб и ныряльщиков.",
+  "desc_en": "A living labyrinth of coral — paradise for fish and divers."
+ },
+ {
+  "id": "beach",
+  "name": "Пляж",
+  "name_en": "Beach",
+  "color": "#e5d08c",
+  "accent": "#f7ecc4",
+  "fertility": 0.3,
+  "move": 1.2,
+  "tree": "palm",
+  "tree_density": 0.012,
+  "rock": 0.02,
+  "animals": [
+   "crab",
+   "turtle",
+   "seagull"
+  ],
+  "races": [
+   "human",
+   "lizardfolk"
+  ],
+  "desc": "Песчаная кайма между морем и сушей. Удобная гавань для первых племён.",
+  "desc_en": "A sandy rim between sea and land. A convenient harbor for first tribes."
+ },
+ {
+  "id": "river",
+  "name": "Река",
+  "name_en": "River",
+  "color": "#2e9bd6",
+  "accent": "#8ad9ff",
+  "fertility": 0.85,
+  "move": 3.0,
+  "tree": "reed",
+  "tree_density": 0.15,
+  "rock": 0.0,
+  "animals": [
+   "fish",
+   "beaver",
+   "frog"
+  ],
+  "races": [
+   "human",
+   "elf",
+   "lizardfolk",
+   "goblin"
+  ],
+  "desc": "Пресная вода — кровь цивилизации. Здесь всегда селятся первые.",
+  "desc_en": "Fresh water is the blood of civilization. The first always settle here."
+ },
+ {
+  "id": "lake",
+  "name": "Озеро",
+  "name_en": "Lake",
+  "color": "#2e86c1",
+  "accent": "#87ceeb",
+  "fertility": 0.75,
+  "move": 4.0,
+  "tree": "reed",
+  "tree_density": 0.1,
+  "rock": 0.0,
+  "animals": [
+   "fish",
+   "frog",
+   "beaver"
+  ],
+  "races": [
+   "human",
+   "elf"
+  ],
+  "desc": "Спокойная вода, отражающая небо и историю.",
+  "desc_en": "Calm water reflecting the sky and history."
+ },
+ {
+  "id": "swamp",
+  "name": "Болото",
+  "name_en": "Swamp",
+  "color": "#4e6e3a",
+  "accent": "#7a9a5a",
+  "fertility": 0.6,
+  "move": 4.5,
+  "tree": "swamp",
+  "tree_density": 0.055,
+  "rock": 0.0,
+  "animals": [
+   "crocodile",
+   "frog",
+   "snake",
+   "heron"
+  ],
+  "races": [
+   "goblin",
+   "lizardfolk",
+   "orc"
+  ],
+  "desc": "Топь, комары и древние тайны. Здесь прячутся те, кого не ждут в городах.",
+  "desc_en": "Mire, mosquitoes and ancient secrets. Here hide those not welcome in cities."
+ },
+ {
+  "id": "meadow",
+  "name": "Луг",
+  "name_en": "Meadow",
+  "color": "#7cb342",
+  "accent": "#aed581",
+  "fertility": 1.0,
+  "move": 1.0,
+  "tree": "broadleaf",
+  "tree_density": 0.01,
+  "rock": 0.01,
+  "animals": [
+   "rabbit",
+   "deer",
+   "sheep",
+   "wolf"
+  ],
+  "races": [
+   "human",
+   "elf",
+   "orc"
+  ],
+  "desc": "Мягкие травы и плодородная земля. Колыбель земледелия.",
+  "desc_en": "Soft grasses and fertile soil. The cradle of agriculture."
+ },
+ {
+  "id": "steppe",
+  "name": "Степь",
+  "name_en": "Steppe",
+  "color": "#c0a35a",
+  "accent": "#e6c97a",
+  "fertility": 0.65,
+  "move": 1.0,
+  "tree": "bush",
+  "tree_density": 0.005,
+  "rock": 0.01,
+  "animals": [
+   "horse",
+   "bison",
+   "antelope",
+   "hyena"
+  ],
+  "races": [
+   "human",
+   "orc"
+  ],
+  "desc": "Бескрайние травы, где рождаются всадники и кочевые империи.",
+  "desc_en": "Endless grass where horsemen and nomad empires are born."
+ },
+ {
+  "id": "savanna",
+  "name": "Саванна",
+  "name_en": "Savanna",
+  "color": "#d4a017",
+  "accent": "#f2c94c",
+  "fertility": 0.7,
+  "move": 1.0,
+  "tree": "acacia",
+  "tree_density": 0.014,
+  "rock": 0.01,
+  "animals": [
+   "zebra",
+   "giraffe",
+   "elephant",
+   "lion",
+   "antelope"
+  ],
+  "races": [
+   "human",
+   "orc"
+  ],
+  "desc": "Золотая трава, редкие акации и большие стада.",
+  "desc_en": "Golden grass, sparse acacias and great herds."
+ },
+ {
+  "id": "forest",
+  "name": "Лес",
+  "name_en": "Forest",
+  "color": "#2e7d32",
+  "accent": "#66bb6a",
+  "fertility": 0.9,
+  "move": 1.8,
+  "tree": "broadleaf",
+  "tree_density": 0.075,
+  "rock": 0.02,
+  "animals": [
+   "deer",
+   "boar",
+   "bear",
+   "wolf",
+   "owl"
+  ],
+  "races": [
+   "elf",
+   "goblin",
+   "human"
+  ],
+  "desc": "Древние стволы, ягоды и грибы. Лес кормит, укрывает и судит.",
+  "desc_en": "Ancient trunks, berries and mushrooms. The forest feeds, shelters and judges."
+ },
+ {
+  "id": "taiga",
+  "name": "Тайга",
+  "name_en": "Taiga",
+  "color": "#3c6b4a",
+  "accent": "#6f9c77",
+  "fertility": 0.45,
+  "move": 2.2,
+  "tree": "conifer",
+  "tree_density": 0.075,
+  "rock": 0.03,
+  "animals": [
+   "elk",
+   "bear",
+   "lynx",
+   "wolf"
+  ],
+  "races": [
+   "dwarf",
+   "human"
+  ],
+  "desc": "Холодный зелёный океан. Зимой здесь выживают только упрямые.",
+  "desc_en": "A cold green ocean. In winter only the stubborn survive."
+ },
+ {
+  "id": "tropical",
+  "name": "Тропический лес",
+  "name_en": "Tropical Forest",
+  "color": "#1f9b47",
+  "accent": "#54d97a",
+  "fertility": 1.1,
+  "move": 2.6,
+  "tree": "palm",
+  "tree_density": 0.09,
+  "rock": 0.01,
+  "animals": [
+   "monkey",
+   "parrot",
+   "jaguar",
+   "snake"
+  ],
+  "races": [
+   "elf",
+   "goblin",
+   "lizardfolk"
+  ],
+  "desc": "Ярусный мир лиан и криков. Здесь всё растёт быстрее, чем умирает.",
+  "desc_en": "A tiered world of vines and cries. Everything grows faster than it dies."
+ },
+ {
+  "id": "desert",
+  "name": "Пустыня",
+  "name_en": "Desert",
+  "color": "#e8c97a",
+  "accent": "#f5e6b8",
+  "fertility": 0.08,
+  "move": 1.8,
+  "tree": "cactus",
+  "tree_density": 0.004,
+  "rock": 0.02,
+  "animals": [
+   "camel",
+   "fennec",
+   "scorpion"
+  ],
+  "races": [
+   "human"
+  ],
+  "desc": "Море песка под белым солнцем. Вода дороже золота.",
+  "desc_en": "A sea of sand under a white sun. Water is worth more than gold."
+ },
+ {
+  "id": "hills",
+  "name": "Холмы",
+  "name_en": "Hills",
+  "color": "#8a9a63",
+  "accent": "#b8c98a",
+  "fertility": 0.55,
+  "move": 2.0,
+  "tree": "bush",
+  "tree_density": 0.02,
+  "rock": 0.18,
+  "animals": [
+   "goat",
+   "ram",
+   "fox",
+   "eagle"
+  ],
+  "races": [
+   "dwarf",
+   "human",
+   "orc"
+  ],
+  "desc": "Волнистая земля, богатая камнем и рудой.",
+  "desc_en": "Rolling land rich in stone and ore."
+ },
+ {
+  "id": "mountains",
+  "name": "Горы",
+  "name_en": "Mountains",
+  "color": "#8d8d8d",
+  "accent": "#bdbdbd",
+  "fertility": 0.12,
+  "move": 5.5,
+  "tree": "conifer",
+  "tree_density": 0.015,
+  "rock": 0.4,
+  "animals": [
+   "goat",
+   "snow_leopard",
+   "eagle"
+  ],
+  "races": [
+   "dwarf",
+   "dragonkin"
+  ],
+  "desc": "Каменные хребты, где прячутся руды и древние крепости.",
+  "desc_en": "Stone ridges hiding ores and ancient fortresses."
+ },
+ {
+  "id": "snow",
+  "name": "Снежные вершины",
+  "name_en": "Snow Peaks",
+  "color": "#f5f5f5",
+  "accent": "#ffffff",
+  "fertility": 0.0,
+  "move": 6.0,
+  "tree": "none",
+  "tree_density": 0.0,
+  "rock": 0.1,
+  "animals": [
+   "snow_leopard",
+   "yeti"
+  ],
+  "races": [
+   "dragonkin"
+  ],
+  "desc": "Белая тишина на высоте, где не живут люди.",
+  "desc_en": "White silence at heights where people do not live."
+ },
+ {
+  "id": "volcano",
+  "name": "Вулкан",
+  "name_en": "Volcano",
+  "color": "#4a2c2a",
+  "accent": "#e64a19",
+  "fertility": 0.2,
+  "move": 4.0,
+  "tree": "dead",
+  "tree_density": 0.02,
+  "rock": 0.5,
+  "animals": [
+   "salamander"
+  ],
+  "races": [
+   "dragonkin"
+  ],
+  "desc": "Дышащая огнём гора. Почва здесь богата, но жизнь коротка.",
+  "desc_en": "A mountain breathing fire. The soil is rich but life is short."
+ },
+ {
+  "id": "ashland",
+  "name": "Пепельная пустошь",
+  "name_en": "Ashland",
+  "color": "#6b6661",
+  "accent": "#8f8a84",
+  "fertility": 0.15,
+  "move": 2.0,
+  "tree": "dead",
+  "tree_density": 0.018,
+  "rock": 0.12,
+  "animals": [
+   "vulture",
+   "scavenger"
+  ],
+  "races": [
+   "goblin",
+   "dragonkin"
+  ],
+  "desc": "Серый мир после катастрофы. Здесь начинают заново.",
+  "desc_en": "A grey world after disaster. Here they start anew."
+ },
+ {
+  "id": "glacier",
+  "name": "Ледник",
+  "name_en": "Glacier",
+  "color": "#cfe8f5",
+  "accent": "#ffffff",
+  "fertility": 0.0,
+  "move": 7.0,
+  "tree": "none",
+  "tree_density": 0.0,
+  "rock": 0.05,
+  "animals": [
+   "penguin",
+   "seal",
+   "polar_bear"
+  ],
+  "races": [],
+  "desc": "Медленные реки льда, которые помнят прошлые зимы.",
+  "desc_en": "Slow rivers of ice that remember past winters."
+ },
+ {
+  "id": "rift",
+  "name": "Магический разлом",
+  "name_en": "Arcane Rift",
+  "color": "#7b4fd6",
+  "accent": "#c9a8ff",
+  "fertility": 0.3,
+  "move": 3.0,
+  "tree": "crystal",
+  "tree_density": 0.18,
+  "rock": 0.2,
+  "animals": [
+   "wisp"
+  ],
+  "races": [
+   "elf",
+   "dragonkin"
+  ],
+  "desc": "Трещина в ткани мира. Магия здесь сильнее, а законы — мягче.",
+  "desc_en": "A crack in the world's fabric. Magic is stronger here and laws are softer."
+ }
+]

@@ -1,0 +1,29 @@
+# Godot / текстовые исходники
+*.gd text eol=lf
+*.tscn text eol=lf
+*.tres text eol=lf
+*.godot text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.cfg text eol=lf
+*.sh text eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Бинарные форматы
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.svg binary
+*.ttf binary
+*.otf binary
+*.ogg binary
+*.wav binary
+*.pck binary
+*.exe binary
+*.dll binary
+
+# Git LFS для готового runtime-бинарника (172 МБ > лимита GitHub 100 МБ)
+build/Aetheria.exe filter=lfs diff=lfs merge=lfs -text

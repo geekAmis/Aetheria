@@ -1,0 +1,120 @@
+AETHERIA — PROPRIETARY LICENSE / ЗАКРЫТАЯ ЛИЦЕНЗИЯ
+================================================================
+
+Copyright (c) 2026 geekAmis. All rights reserved. / Все права защищены.
+
+РУССКИЙ
+--------
+Настоящая лицензия распространяется на оригинальный код, данные, документацию,
+графику, звук, текст и иные материалы проекта Aetheria (далее — «Проект»),
+созданные автором Проекта, за исключением сторонних компонентов, перечисленных
+в файле THIRD_PARTY.md.
+
+1. РАЗРЕШЁННОЕ ИСПОЛЬЗОВАНИЕ
+   1.1. Вам разрешено запускать собранную игру для личного, некоммерческого
+        использования.
+   1.2. Вам разрешено создавать и распространять бесплатные моды к игре
+        (далее — «Моды») исключительно как отдельные файлы-надстройки,
+        не содержащие и не заменяющие основные файлы Проекта.
+   1.3. Моды должны размещаться в отдельной папке mods/<имя_мода>/data/
+        или в пользовательской папке mods и подключаться штатным загрузчиком
+        Проекта. Мод не должен изменять, удалять, переименовывать или
+        подменять основные файлы.
+
+2. ЗАПРЕЩЁННЫЕ ДЕЙСТВИЯ
+   2.1. Запрещается модернизация, изменение, удаление, переименование,
+        рефакторинг, декомпиляция, дизассемблирование, патчинг, обход
+        защиты и любое иное вмешательство в основные файлы Проекта,
+        включая game/scripts/**, game/scenes/**, game/data/**,
+        game/assets/**, game/project.godot, build/** и docs/**.
+   2.2. Запрещается распространять, публиковать, продавать, сдавать в аренду,
+        сублицензировать или иным образом передавать основные файлы Проекта
+        либо их изменённые версии.
+   2.3. Запрещается включать основные файлы Проекта в другие продукты,
+        сборники, моды, архивы или сервисы.
+   2.4. Запрещается удалять или скрывать уведомления об авторских правах,
+        названии Проекта и лицензии.
+   2.5. Запрещается использовать название, логотип, домен, аккаунты или
+        оформление Проекта, чтобы выдать себя за автора, правообладателя
+        или официальный канал Проекта.
+   2.6. Запрещается коммерческое использование Проекта и его частей без
+        отдельного письменного разрешения правообладателя.
+
+3. МОДЫ
+   3.1. Мод является самостоятельным произведением его автора и не должен
+        содержать код, данные или ассеты основных файлов Проекта.
+   3.2. Автор мода не вправе заявлять, что мод является официальной частью
+        Проекта, если на это нет письменного разрешения правообладателя.
+   3.3. Правообладатель не гарантирует совместимость Модов с будущими
+        версиями и не несёт ответственности за ущерб, вызванный Модами.
+
+4. СТОРОННИЕ КОМПОНЕНТЫ
+   4.1. Godot Engine распространяется по лицензии MIT.
+   4.2. Ассеты Kenney распространяются по CC0.
+   4.3. Шрифты Rubik и Cormorant Garamond распространяются по SIL OFL 1.1.
+   4.4. Настоящая лицензия не ограничивает права, предоставленные лицензиями
+        сторонних компонентов, и не распространяется на них.
+
+5. ПРЕКРАЩЕНИЕ
+   5.1. При нарушении настоящей лицензии право использования автоматически
+        прекращается. Вы обязаны удалить все копии основных файлов Проекта.
+
+6. ОТСУТСТВИЕ ГАРАНТИЙ
+   6.1. Проект предоставляется «как есть». Правообладатель не даёт никаких
+        гарантий и не несёт ответственности за любые убытки, возникшие
+        в результате использования или невозможности использования Проекта.
+
+ENGLISH
+-------
+This license applies to the original code, data, documentation, art, audio,
+text and other materials of the Aetheria project (the "Project") created by
+the Project author, excluding third-party components listed in THIRD_PARTY.md.
+
+1. PERMITTED USE
+   1.1. You may run the compiled game for personal, non-commercial use.
+   1.2. You may create and distribute free mods solely as separate overlay
+        files that do not contain or replace the Project's core files.
+   1.3. Mods must live in a separate mods/<mod_name>/data/ directory (or the
+        user mods directory) and be loaded through the Project's official
+        loader. A mod must not modify, delete, rename or substitute core files.
+
+2. PROHIBITED ACTIONS
+   2.1. You may not modernize, modify, delete, rename, refactor, decompile,
+        disassemble, patch, bypass protections in, or otherwise interfere
+        with the core files, including game/scripts/**, game/scenes/**,
+        game/data/**, game/assets/**, game/project.godot, build/** and
+        docs/**.
+   2.2. You may not distribute, publish, sell, rent, sublicense or otherwise
+        transfer the core files or any modified versions.
+   2.3. You may not include the core files in other products, compilations,
+        mods, archives or services.
+   2.4. You may not remove or obscure copyright, project name or license
+        notices.
+   2.5. You may not use the Project's name, logo, domain, accounts or visual
+        identity to impersonate the author, rights holder or official channel.
+   2.6. Commercial use of the Project or its parts requires prior written
+        permission from the rights holder.
+
+3. MODS
+   3.1. A mod is the independent work of its author and must not contain code,
+        data or assets from the Project's core files.
+   3.2. A mod author may not claim that a mod is an official part of the
+        Project without written permission.
+   3.3. The rights holder does not guarantee mod compatibility with future
+        versions and is not liable for damage caused by mods.
+
+4. THIRD-PARTY COMPONENTS
+   4.1. Godot Engine is licensed under MIT.
+   4.2. Kenney assets are licensed under CC0.
+   4.3. Rubik and Cormorant Garamond fonts are licensed under SIL OFL 1.1.
+   4.4. This license does not restrict rights granted by third-party licenses
+        and does not apply to third-party components.
+
+5. TERMINATION
+   5.1. Any violation terminates your right to use the Project automatically.
+        You must delete all copies of the core files.
+
+6. NO WARRANTY
+   6.1. The Project is provided "as is", without warranties of any kind. The
+        rights holder is not liable for any damages arising from the use or
+        inability to use the Project.

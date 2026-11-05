@@ -1,0 +1,57 @@
+[
+  {"id":"fire","era":0,"name":"Огонь","name_en":"Fire","cost":90,"desc":"Тепло, свет и защита от ночных хищников.","desc_en":"Warmth, light and protection from night predators.","mods":{"food":0.05,"growth":0.05,"health":0.05}},
+  {"id":"language","era":0,"name":"Язык","name_en":"Language","cost":110,"desc":"Общий рассказ связывает племя крепче крови.","desc_en":"A shared story binds a tribe tighter than blood.","mods":{"science":0.1,"happiness":0.05}},
+  {"id":"gathering","era":0,"name":"Собирательство","name_en":"Foraging","cost":95,"desc":"Ягоды, коренья и грибы — первые кладовые.","desc_en":"Berries, roots and mushrooms are the first pantries.","mods":{"food":0.12}},
+  {"id":"stone_tools","era":0,"name":"Каменные орудия","name_en":"Stone Tools","cost":120,"desc":"Острый камень экономит силы и жизни.","desc_en":"A sharp stone saves strength and lives.","mods":{"prod":0.1,"military":0.05}},
+  {"id":"primitive_belief","era":0,"name":"Первобытная вера","name_en":"Primitive Belief","cost":130,"desc":"Духи реки и леса получают имена.","desc_en":"Spirits of river and forest receive names.","mods":{"happiness":0.08,"health":0.03}},
+  {"id":"husbandry","era":0,"name":"Скотоводство","name_en":"Animal Husbandry","cost":150,"desc":"Прирученное стадо — ходячая кладовая.","desc_en":"A tamed herd is a walking pantry.","mods":{"food":0.15,"growth":0.04}},
+
+  {"id":"agriculture","era":1,"name":"Земледелие","name_en":"Agriculture","cost":280,"desc":"Семя, борозда и терпение кормят больше, чем охота.","desc_en":"Seed, furrow and patience feed more than hunting.","mods":{"food":0.2,"growth":0.08}},
+  {"id":"pottery","era":1,"name":"Керамика","name_en":"Pottery","cost":300,"desc":"Глина хранит воду, зерно и память.","desc_en":"Clay stores water, grain and memory.","mods":{"food":0.08,"happiness":0.03}},
+  {"id":"masonry","era":1,"name":"Каменная кладка","name_en":"Masonry","cost":320,"desc":"Стены, которые переживут строителей.","desc_en":"Walls that will outlive their builders.","mods":{"prod":0.1,"military":0.08}},
+  {"id":"wheel","era":1,"name":"Колесо","name_en":"The Wheel","cost":340,"desc":"Груз катится, торговля ускоряется, дороги обретают смысл.","desc_en":"Cargo rolls, trade accelerates, roads gain meaning.","mods":{"prod":0.12,"growth":0.03}},
+  {"id":"bronze","era":1,"name":"Бронза","name_en":"Bronze Working","cost":360,"desc":"Медь и олово дают оружие, которое не тупится о камень.","desc_en":"Copper and tin give weapons that do not dull on stone.","mods":{"military":0.18,"prod":0.08}},
+  {"id":"writing","era":1,"name":"Письменность","name_en":"Writing","cost":380,"desc":"Слово остаётся после смерти говорящего.","desc_en":"The word remains after the speaker dies.","mods":{"science":0.2,"happiness":0.03}},
+
+  {"id":"iron","era":2,"name":"Железо","name_en":"Iron Working","cost":720,"desc":"Дешёвый прочный металл меняет войну и пахоту.","desc_en":"Cheap durable metal changes war and plough.","mods":{"military":0.22,"prod":0.14}},
+  {"id":"currency","era":2,"name":"Деньги","name_en":"Currency","cost":760,"desc":"Общий эквивалент желаний.","desc_en":"A common equivalent of desires.","mods":{"growth":0.06,"prod":0.1}},
+  {"id":"roads","era":2,"name":"Дороги","name_en":"Roads","cost":800,"desc":"Армия и торговец идут быстрее.","desc_en":"Army and merchant move faster.","mods":{"prod":0.1,"military":0.08,"growth":0.04}},
+  {"id":"archery","era":2,"name":"Лучное дело","name_en":"Archery","cost":840,"desc":"Смерть приходит издалека.","desc_en":"Death comes from afar.","mods":{"military":0.16}},
+  {"id":"aqueduct","era":2,"name":"Акведук","name_en":"Aqueducts","cost":880,"desc":"Вода приходит в город сама.","desc_en":"Water comes to the city by itself.","mods":{"health":0.12,"growth":0.08}},
+  {"id":"philosophy","era":2,"name":"Философия","name_en":"Philosophy","cost":920,"desc":"Вопросы важнее ответов.","desc_en":"Questions matter more than answers.","mods":{"science":0.18,"happiness":0.05}},
+
+  {"id":"feudalism","era":3,"name":"Феодализм","name_en":"Feudalism","cost":1900,"desc":"Земля за службу, служба за землю.","desc_en":"Land for service, service for land.","mods":{"military":0.15,"prod":0.1,"growth":0.03}},
+  {"id":"castles","era":3,"name":"Замки","name_en":"Castles","cost":2050,"desc":"Камень, подъёмный мост и очень толстые двери.","desc_en":"Stone, drawbridge and very thick doors.","mods":{"military":0.2}},
+  {"id":"guilds","era":3,"name":"Гильдии","name_en":"Guilds","cost":2150,"desc":"Мастера договариваются о цене и качестве.","desc_en":"Craftsmen agree on price and quality.","mods":{"prod":0.18,"growth":0.04}},
+  {"id":"universities","era":3,"name":"Университеты","name_en":"Universities","cost":2300,"desc":"Знание перестаёт быть роскошью.","desc_en":"Knowledge stops being a luxury.","mods":{"science":0.25,"happiness":0.04}},
+  {"id":"banking","era":3,"name":"Банковское дело","name_en":"Banking","cost":2450,"desc":"Деньги учатся работать без хозяина.","desc_en":"Money learns to work without its owner.","mods":{"prod":0.15,"growth":0.05}},
+  {"id":"alchemy","era":3,"name":"Алхимия","name_en":"Alchemy","cost":2600,"desc":"Иногда свинец не становится золотом, но становится порохом.","desc_en":"Sometimes lead does not become gold but becomes gunpowder.","mods":{"science":0.15,"magic":0.2}},
+
+  {"id":"printing","era":4,"name":"Книгопечатание","name_en":"Printing Press","cost":4800,"desc":"Тысяча копий одной мысли.","desc_en":"A thousand copies of one thought.","mods":{"science":0.3,"happiness":0.06}},
+  {"id":"gunpowder","era":4,"name":"Порох","name_en":"Gunpowder","cost":5100,"desc":"Стены перестают быть гарантией.","desc_en":"Walls stop being a guarantee.","mods":{"military":0.28}},
+  {"id":"astronomy","era":4,"name":"Астрономия","name_en":"Astronomy","cost":5300,"desc":"Небо становится картой.","desc_en":"The sky becomes a map.","mods":{"science":0.22}},
+  {"id":"navigation","era":4,"name":"Навигация","name_en":"Navigation","cost":5600,"desc":"Горизонт перестаёт быть краем мира.","desc_en":"The horizon stops being the edge of the world.","mods":{"growth":0.08,"prod":0.1}},
+  {"id":"medicine","era":4,"name":"Медицина","name_en":"Medicine","cost":5800,"desc":"Лекарь спорит со смертью и иногда выигрывает.","desc_en":"A healer argues with death and sometimes wins.","mods":{"health":0.2,"growth":0.08}},
+  {"id":"mechanics","era":4,"name":"Механика","name_en":"Mechanics","cost":6000,"desc":"Шестерни, рычаги и первые машины.","desc_en":"Gears, levers and the first machines.","mods":{"prod":0.2}},
+
+  {"id":"steam","era":5,"name":"Паровой двигатель","name_en":"Steam Engine","cost":11000,"desc":"Уголь превращается в движение.","desc_en":"Coal turns into motion.","mods":{"prod":0.35,"growth":0.1}},
+  {"id":"electricity","era":5,"name":"Электричество","name_en":"Electricity","cost":12000,"desc":"Города перестают бояться темноты.","desc_en":"Cities stop fearing the dark.","mods":{"prod":0.25,"happiness":0.08,"science":0.1}},
+  {"id":"railways","era":5,"name":"Железные дороги","name_en":"Railways","cost":12800,"desc":"Расстояние теряет власть.","desc_en":"Distance loses its power.","mods":{"prod":0.2,"military":0.12,"growth":0.08}},
+  {"id":"steel","era":5,"name":"Сталь","name_en":"Steel","cost":13500,"desc":"Металл, который держит небоскрёбы и пушки.","desc_en":"Metal that holds skyscrapers and cannons.","mods":{"prod":0.22,"military":0.15}},
+  {"id":"telegraph","era":5,"name":"Телеграф","name_en":"Telegraph","cost":14200,"desc":"Слово обгоняет лошадь.","desc_en":"The word outruns the horse.","mods":{"science":0.15,"growth":0.05}},
+  {"id":"sanitation","era":5,"name":"Санитария","name_en":"Sanitation","cost":15000,"desc":"Канализация спасает больше жизней, чем армия.","desc_en":"Sewers save more lives than an army.","mods":{"health":0.25,"growth":0.12}},
+
+  {"id":"combustion","era":6,"name":"Двигатель внутреннего сгорания","name_en":"Combustion Engine","cost":28000,"desc":"Нефть становится скоростью.","desc_en":"Oil becomes speed.","mods":{"prod":0.3,"military":0.15}},
+  {"id":"flight","era":6,"name":"Авиация","name_en":"Flight","cost":29500,"desc":"Человек смотрит на мир сверху.","desc_en":"Man looks at the world from above.","mods":{"military":0.2,"science":0.1}},
+  {"id":"radio","era":6,"name":"Радио","name_en":"Radio","cost":31000,"desc":"Голос слышен на другом континенте.","desc_en":"A voice is heard on another continent.","mods":{"happiness":0.1,"science":0.1}},
+  {"id":"antibiotics","era":6,"name":"Антибиотики","name_en":"Antibiotics","cost":32500,"desc":"Невидимые враги отступают.","desc_en":"Invisible enemies retreat.","mods":{"health":0.3,"growth":0.15}},
+  {"id":"computers","era":6,"name":"Компьютеры","name_en":"Computers","cost":34500,"desc":"Машины начинают считать быстрее людей.","desc_en":"Machines begin to count faster than people.","mods":{"science":0.3,"prod":0.15}},
+  {"id":"nuclear_physics","era":6,"name":"Ядерная физика","name_en":"Nuclear Physics","cost":36500,"desc":"Атом раскрывает секрет, который лучше бы не знать.","desc_en":"The atom reveals a secret better left unknown.","mods":{"science":0.2,"military":0.2}},
+
+  {"id":"atomic_power","era":7,"name":"Атомная энергия","name_en":"Atomic Power","cost":76000,"desc":"Свет без дыма — и тень без конца.","desc_en":"Light without smoke — and a shadow without end.","mods":{"prod":0.3,"science":0.15}},
+  {"id":"rocketry","era":7,"name":"Ракетостроение","name_en":"Rocketry","cost":80000,"desc":"Небо перестаёт быть пределом.","desc_en":"The sky stops being the limit.","mods":{"military":0.25,"science":0.2}},
+  {"id":"satellites","era":7,"name":"Спутники","name_en":"Satellites","cost":84000,"desc":"Мир впервые видит себя целиком.","desc_en":"The world first sees itself whole.","mods":{"science":0.25,"happiness":0.08}},
+  {"id":"lasers","era":7,"name":"Лазеры","name_en":"Lasers","cost":88000,"desc":"Свет становится скальпелем и мечом.","desc_en":"Light becomes scalpel and sword.","mods":{"military":0.3,"science":0.12}},
+  {"id":"internet","era":7,"name":"Интернет","name_en":"Internet","cost":92000,"desc":"Все библиотеки мира в одной комнате.","desc_en":"All the world's libraries in one room.","mods":{"science":0.35,"happiness":0.1}},
+  {"id":"fusion","era":7,"name":"Термояд","name_en":"Fusion Power","cost":98000,"desc":"Маленькое солнце в подвале.","desc_en":"A small sun in the basement.","mods":{"prod":0.4,"science":0.25,"health":0.1}}
+]

@@ -1,0 +1,10 @@
+[
+  {"id":"stone","name":"Каменный век","name_en":"Stone Age","color":"#a08a6a","desc":"Костёр, камень и слово. Мир впервые замечает, что его кто-то создал.","desc_en":"Fire, stone and word. The world first notices someone created it."},
+  {"id":"bronze","name":"Бронзовый век","name_en":"Bronze Age","color":"#c08a4a","desc":"Металл, колесо и письмо. Племена становятся народами.","desc_en":"Metal, wheel and writing. Tribes become peoples."},
+  {"id":"iron","name":"Железный век","name_en":"Iron Age","color":"#8a8a9a","desc":"Железо дешевле золота, а золото покупает железо.","desc_en":"Iron is cheaper than gold, and gold buys iron."},
+  {"id":"medieval","name":"Средневековье","name_en":"Middle Ages","color":"#9a7a5a","desc":"Замки, соборы и длинные родословные.","desc_en":"Castles, cathedrals and long genealogies."},
+  {"id":"renaissance","name":"Ренессанс","name_en":"Renaissance","color":"#c9a04a","desc":"Порох и печатный станок меняют всё быстрее, чем короли успевают запретить.","desc_en":"Gunpowder and the printing press change everything faster than kings can ban it."},
+  {"id":"industrial","name":"Индустриальная эра","name_en":"Industrial Era","color":"#8a6a4a","desc":"Пар, сталь и дым. Города растут быстрее, чем кладбища.","desc_en":"Steam, steel and smoke. Cities grow faster than graveyards."},
+  {"id":"modern","name":"Современность","name_en":"Modern Era","color":"#5a8aaa","desc":"Электричество, радио и самолёты сжимают мир до одного экрана.","desc_en":"Electricity, radio and aircraft shrink the world to one screen."},
+  {"id":"atomic","name":"Атомная эра","name_en":"Atomic Age","color":"#d86a3a","desc":"Человечество получает силу, равную богам, и учится бояться собственных рук.","desc_en":"Humanity gains the power of gods and learns to fear its own hands."}
+]
