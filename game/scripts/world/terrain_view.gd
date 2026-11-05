@@ -20,6 +20,8 @@ var dirty_water: Dictionary = {}
 var chunks_per_frame := 1
 var water_per_frame := 1
 var last_edit_ms := 0
+var last_frame_us := 0
+var skip_budget := false
 var prof_us := 0
 var prof_water_us := 0
 var prof_n := 0
@@ -128,7 +130,11 @@ func _queue_rect(rect: Rect2i) -> void:
 
 
 func _process(_delta: float) -> void:
+	if skip_budget:
+		last_frame_us = 0
+		return
 	if dirty_chunks.is_empty() and dirty_water.is_empty():
+		last_frame_us = 0
 		return
 	var t0 := Time.get_ticks_usec()
 	if not dirty_chunks.is_empty():
@@ -152,6 +158,7 @@ func _process(_delta: float) -> void:
 			_build_water_chunk(wkey)
 	if not prof_on and "--profile" in OS.get_cmdline_args():
 		prof_on = true
+	last_frame_us = Time.get_ticks_usec() - t0
 	if prof_on:
 		prof_us += t1 - t0
 		prof_water_us += Time.get_ticks_usec() - t1

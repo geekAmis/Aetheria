@@ -38,6 +38,7 @@ var stroke_tool := ""
 var hover_cell := Vector2i(-1, -1)
 var hover_timer := 0.0
 var hud_timer := 0.0
+var last_hud_us := 0
 var sky_timer := 0.0
 var autosave_timer := 180.0
 var save_dirty := true
@@ -223,6 +224,9 @@ func _create_hud() -> void:
 	hud.menu_requested.connect(func(): back_to_menu.emit())
 	hud.select_settlement.connect(func(id): select_settlement(id))
 	hud.follow_toggled.connect(func(id): follow_agent = id)
+	hud.god_agent_action.connect(_on_god_agent_action)
+	hud.favourite_toggled.connect(_on_favourite_toggled)
+	hud.spawn_requested.connect(_on_spawn_requested)
 	hud.server_settings_changed.connect(_on_settings_changed)
 	hud.set_speed(speed)
 	hud.update_essence(essence, sandbox)
@@ -278,6 +282,73 @@ func refresh_inspector_force() -> void:
 		hud.refresh_inspector()
 
 
+func _on_god_agent_action(kind: String) -> void:
+	var a := get_selected_agent()
+	if a == null or not a.alive:
+		return
+	var res := sim.god_agent_action(a, kind)
+	if res == "":
+		return
+	var word := {
+		"heal": "исцелён", "bless": "благословлён", "curse": "проклят",
+		"scare": "напуган", "reward": "награждён", "immortal": "отмечен вечностью",
+		"perk_tough": "получил перк", "perk_genius": "получил перк", "perk_swift": "получил перк"
+	}.get(kind, kind)
+	hud.toast("%s %s" % [a.display_name(), word], "power" if kind != "scare" else "warn")
+	SFX.play("bless" if kind in ["heal", "bless", "reward", "immortal"] else "curse", -6.0)
+	if kind in ["heal", "bless", "reward", "immortal"]:
+		fx.play("bless", a.pos, 1.4, {"kind": "health"})
+	else:
+		fx.play("curse", a.pos, 1.2, {"kind": "fear"})
+	refresh_inspector_force()
+
+
+func _on_favourite_toggled(id: int) -> void:
+	var a: AgentData = sim.agent_by_id.get(id, null)
+	if a == null:
+		return
+	a.favourite = not a.favourite
+	if a.favourite:
+		hud.toast("%s добавлен в избранное" % a.display_name(), "info")
+	refresh_inspector_force()
+
+
+func _on_spawn_requested(kind: String, data: Dictionary) -> void:
+	var cell := hud.last_hover_cell
+	if cell.x < 0 or not world.in_bounds(cell.x, cell.y):
+		var s0 := get_selected_settlement()
+		cell = s0.center if s0 != null else Vector2i(world.size / 2, world.size / 2)
+	if world.is_water_cell(cell.x, cell.y):
+		var land := Vector2i(-1, -1)
+		for r in range(1, 8):
+			for dz in range(-r, r + 1):
+				for dx in range(-r, r + 1):
+					if maxi(absi(dx), absi(dz)) != r:
+						continue
+					if world.is_land_cell(cell.x + dx, cell.y + dz):
+						land = Vector2i(cell.x + dx, cell.y + dz)
+						break
+				if land.x >= 0: break
+			if land.x >= 0: break
+		if land.x >= 0:
+			cell = land
+	if kind == "creature":
+		var s := sim._settlement_near(cell, 24.0)
+		var sid := s.id if s != null else -1
+		var a := sim.spawn_agent_custom(cell, str(data.species_id), int(data.gender), float(data.age), sid)
+		selected_agent_id = a.id
+		selected_settlement_id = -1
+		sim.selected_settlement_id = -1
+		creature_view.set_selected(a.id)
+		hud.inspect_agent(a)
+		hud.toast("Создан %s" % a.display_name(), "power")
+	else:
+		var an := sim.spawn_animal_custom(cell, str(data.species_id), int(data.gender), float(data.age))
+		if not an.is_empty():
+			hud.toast("Создано животное: %s" % L.tc(D.animal(str(data.species_id))), "info")
+	refresh_inspector_force()
+
+
 func _finish_start() -> void:
 	paused = false
 	speed = 1.0
@@ -300,6 +371,10 @@ func _finish_start() -> void:
 func _process(delta: float) -> void:
 	if sim == null or world == null:
 		return
+	if terrain_view != null:
+		terrain_view.skip_budget = false
+	if creature_view != null:
+		creature_view.skip_sync = false
 	play_seconds += delta
 	if hud != null and hud.is_modal_open():
 		pass
@@ -322,6 +397,13 @@ func _process(delta: float) -> void:
 			if save_dirty and sim.total_population > 0:
 				save_to_slot(0, true)
 				save_dirty = false
+	# если день был тяжёлым, пропускаем тяжёлые пересборки в этом кадре
+	if sim.heavy_step_fresh:
+		if terrain_view != null:
+			terrain_view.skip_budget = true
+		if creature_view != null:
+			creature_view.skip_sync = true
+		sim.heavy_step_fresh = false
 	# кисть
 	if stroke_active and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not _over_ui():
 		stroke_last += delta
@@ -360,11 +442,13 @@ func _process(delta: float) -> void:
 func _update_hud() -> void:
 	if hud == null:
 		return
+	var t0 := Time.get_ticks_usec()
 	hud.update_top(sim.date_text(), sim.season_text(), sim.total_population, _alive_settlements(), _world_era(), essence, sandbox, speed, paused)
 	hud.update_essence(essence, sandbox)
 	hud.update_hover(hover_cell, world)
 	hud.refresh_inspector()
 	hud.stats_changed()
+	last_hud_us = Time.get_ticks_usec() - t0
 
 
 func _world_era() -> int:
@@ -408,15 +492,47 @@ func _move_agents(delta: float) -> void:
 		return
 	var mult := 1.0 + speed * 0.14
 	var half := world.size * 0.5
+	var road_bonus := {}
+	for s in sim.settlements:
+		for oid in s.roads:
+			if float(s.roads[oid].get("progress", 0.0)) >= 1.0:
+				road_bonus[s.id] = 1.18
+				break
 	for av in sim.agents:
 		var a: AgentData = av
 		if not a.alive:
 			continue
+		# охота: цель — животное, при сближении — добыча
+		if a.action == "hunt":
+			var an: Dictionary = sim.animal_by_id.get(a.hunting_id, {})
+			if an.is_empty() or not bool(an.get("alive", false)):
+				a.hunting_id = -1
+				a.action_time = a.action_duration
+			else:
+				a.target = an.pos
+				if a.pos.distance_to(Vector2(an.pos)) < 1.15:
+					sim.complete_hunt(a, an)
+					continue
+		elif a.action == "haul":
+			if a.pos.distance_to(a.target) < 1.2:
+				sim.complete_haul(a)
+				continue
+		elif a.action == "flee" and a.pos.distance_to(a.target) < 0.6:
+			a.action_time = a.action_duration
 		var to: Vector2 = a.target - a.pos
 		var d: float = to.length()
 		if d < 0.08:
 			continue
-		var step: float = a.speed * 0.42 * mult * delta
+		var spd := a.speed * 0.42 * mult
+		if a.action == "flee" or a.action == "hunt":
+			spd *= 1.35
+		elif a.action == "sleep":
+			spd *= 0.5
+		elif a.action in ["build", "work", "eat", "drink", "pray"]:
+			spd *= 0.9
+		if road_bonus.has(a.settlement_id) and a.action in ["march", "haul", "work"]:
+			spd *= 1.18
+		var step: float = spd * delta
 		var next: Vector2 = a.pos + (to / d) * minf(step, d)
 		var cc := world.cell_of(next)
 		if world.is_water_cell(cc.x, cc.y):

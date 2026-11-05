@@ -41,6 +41,27 @@ var born_year: int = 0
 var death_cause: String = ""
 var notable: bool = false
 var journey_timer: float = 0.0
+# --- Living World: действие, эмоция, внешность, предмет ---
+var action: String = "wander"
+var action_target: Vector2 = Vector2.ZERO
+var action_progress: float = 0.0
+var action_time: float = 0.0
+var action_utility: float = 0.0
+var action_reason: String = ""
+var action_duration: float = 2.0
+var emotion: String = "neutral"
+var emotion_reason: String = ""
+var emotion_timer: float = 0.0
+var carrying: String = ""
+var carry_amount: float = 0.0
+var hunting_id: int = -1
+var immortal: bool = false
+var unkillable: bool = false
+var favourite: bool = false
+var appearance: Dictionary = {}
+var bonds: Dictionary = {}   # agent id -> affinity -100..100
+var war_phase: String = ""
+var home_pos: Vector2 = Vector2.ZERO
 
 
 func setup(p_id: int, p_race: Dictionary, p_gender: int, p_age: float, rng: RandomNumberGenerator) -> void:
@@ -89,6 +110,56 @@ func setup(p_id: int, p_race: Dictionary, p_gender: int, p_age: float, rng: Rand
 			perks.append(pk)
 	max_health = compute_max_health(p_race)
 	health = max_health
+	appearance = {
+		"variant": rng.randi_range(0, 7),
+		"accessory": rng.randi_range(0, 11),
+		"hair": rng.randi_range(0, 5),
+		"skin": rng.randf_range(-0.06, 0.08),
+		"hue": rng.randf()
+	}
+	home_pos = pos
+
+
+func set_action(p_id: String, p_target: Vector2, reason: String = "", duration: float = 2.0) -> void:
+	if action != p_id:
+		action_progress = 0.0
+		action_time = 0.0
+	action = p_id
+	action_target = p_target
+	action_reason = reason
+	action_duration = duration
+	target = p_target
+	state = p_id
+
+
+func set_emotion(p_emotion: String, reason: String = "", days: float = 24.0) -> void:
+	emotion = p_emotion
+	emotion_reason = reason
+	emotion_timer = maxf(emotion_timer, days)
+
+
+func update_emotion(dt_days: float) -> void:
+	if emotion_timer > 0.0:
+		emotion_timer = maxf(0.0, emotion_timer - dt_days)
+		if emotion_timer <= 0.0:
+			emotion = "neutral"
+			emotion_reason = ""
+
+
+func bond_with(other_id: int, delta: float) -> void:
+	var v := float(bonds.get(other_id, 0.0)) + delta
+	bonds[other_id] = clampf(v, -100.0, 100.0)
+
+
+func soulmate() -> int:
+	var best := -1
+	var best_v := 0.0
+	for k in bonds:
+		var v := float(bonds[k])
+		if v > best_v:
+			best_v = v
+			best = int(k)
+	return best
 
 
 func compute_max_health(p_race: Dictionary = {}) -> float:
@@ -174,7 +245,15 @@ func to_dict() -> Dictionary:
 		"pos": [pos.x, pos.y], "target": [target.x, target.y], "speed": speed,
 		"alive": alive, "partner_id": partner_id, "pregnant": pregnant,
 		"father_id": father_id, "children": children, "equipment": equipment,
-		"kills": kills, "born_year": born_year, "notable": notable
+		"kills": kills, "born_year": born_year, "notable": notable,
+		"action": action, "action_target": [action_target.x, action_target.y],
+		"action_progress": action_progress, "action_time": action_time,
+		"action_utility": action_utility, "action_reason": action_reason,
+		"action_duration": action_duration,
+		"emotion": emotion, "emotion_reason": emotion_reason, "emotion_timer": emotion_timer,
+		"carrying": carrying, "carry_amount": carry_amount, "hunting_id": hunting_id,
+		"immortal": immortal, "unkillable": unkillable, "favourite": favourite,
+		"appearance": appearance, "bonds": bonds, "home_pos": [home_pos.x, home_pos.y]
 	}
 
 
@@ -214,9 +293,35 @@ static func from_dict(d: Dictionary) -> AgentData:
 	a.partner_id = int(d.get("partner_id", -1))
 	a.pregnant = float(d.get("pregnant", 0))
 	a.father_id = int(d.get("father_id", -1))
-	a.children = d.get("children", [])
+	a.children = []
+	for ch in d.get("children", []):
+		a.children.append(int(ch))
 	a.equipment = int(d.get("equipment", 0))
 	a.kills = int(d.get("kills", 0))
 	a.born_year = int(d.get("born_year", 0))
 	a.notable = bool(d.get("notable", false))
+	a.action = str(d.get("action", "wander"))
+	var at: Array = d.get("action_target", [0, 0])
+	a.action_target = Vector2(float(at[0]), float(at[1]))
+	a.action_progress = float(d.get("action_progress", 0))
+	a.action_time = float(d.get("action_time", 0))
+	a.action_utility = float(d.get("action_utility", 0))
+	a.action_reason = str(d.get("action_reason", ""))
+	a.action_duration = float(d.get("action_duration", 2))
+	a.emotion = str(d.get("emotion", "neutral"))
+	a.emotion_reason = str(d.get("emotion_reason", ""))
+	a.emotion_timer = float(d.get("emotion_timer", 0))
+	a.carrying = str(d.get("carrying", ""))
+	a.carry_amount = float(d.get("carry_amount", 0))
+	a.hunting_id = int(d.get("hunting_id", -1))
+	a.immortal = bool(d.get("immortal", false))
+	a.unkillable = bool(d.get("unkillable", false))
+	a.favourite = bool(d.get("favourite", false))
+	a.appearance = d.get("appearance", {}).duplicate()
+	a.bonds = {}
+	var bd: Dictionary = d.get("bonds", {})
+	for k in bd:
+		a.bonds[int(k)] = float(bd[k])
+	var hp: Array = d.get("home_pos", [a.pos.x, a.pos.y])
+	a.home_pos = Vector2(float(hp[0]), float(hp[1]))
 	return a

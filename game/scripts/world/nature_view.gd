@@ -23,6 +23,7 @@ var bio_rock := PackedFloat32Array()
 var bio_flower := PackedByteArray()
 var bio_mushroom := PackedByteArray()
 var defer_until_ms := 0
+var last_frame_us := 0
 
 
 func setup(p_world: WorldModel) -> void:
@@ -74,8 +75,10 @@ func mark_dirty_rect(rect: Rect2i) -> void:
 
 func _process(_delta: float) -> void:
 	if dirty_chunks.is_empty():
+		last_frame_us = 0
 		return
 	if Time.get_ticks_msec() < defer_until_ms:
+		last_frame_us = 0
 		return
 	var t0 := Time.get_ticks_usec()
 	var keys := dirty_chunks.keys()
@@ -89,6 +92,7 @@ func _process(_delta: float) -> void:
 		_rebuild_chunk(key)
 	if not prof_on and "--profile" in OS.get_cmdline_args():
 		prof_on = true
+	last_frame_us = Time.get_ticks_usec() - t0
 	if prof_on:
 		prof_us += Time.get_ticks_usec() - t0
 		prof_n += 1

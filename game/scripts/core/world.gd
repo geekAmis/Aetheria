@@ -258,6 +258,15 @@ func _generate_heights(preset: Dictionary) -> void:
 			h += ridge * 0.42 * mountain_mask * mountain_amt
 			# мелкая детализация
 			h += _noise3.get_noise_2d(x, z) * 0.012
+			# крупные равнины и речные низины: низкочастотная маска сглаживает рельеф
+			var plain_n := (_warp.get_noise_2d(x * 0.35 + 9000.0, z * 0.35 + 9000.0) + 1.0) * 0.5
+			var plain_mask := smoothstep(0.52, 0.82, plain_n)
+			if plain_mask > 0.001:
+				h -= _noise3.get_noise_2d(x, z) * 0.012 * plain_mask
+				var base := clampf(cont * 0.55 + 0.24, 0.05, 0.95)
+				h = lerpf(h, base, plain_mask * 0.60)
+				# террасы в поймах
+				h = lerpf(h, roundf(h * 48.0) / 48.0, plain_mask * 0.35)
 			heights[idx(x, z)] = clampf(h, 0.0, 1.0)
 
 	# уровень моря из целевой доли суши
@@ -296,6 +305,13 @@ func _generate_heights(preset: Dictionary) -> void:
 				var i := idx(x, z)
 				var avg := (heights[idx(x - 1, z)] + heights[idx(x + 1, z)] + heights[idx(x, z - 1)] + heights[idx(x, z + 1)]) * 0.25
 				heights[i] = lerpf(heights[i], avg, 0.22)
+	# удаление одиночных пиков и игл
+	for z in range(1, size - 1):
+		for x in range(1, size - 1):
+			var i2 := idx(x, z)
+			var avg2 := (heights[idx(x - 1, z)] + heights[idx(x + 1, z)] + heights[idx(x, z - 1)] + heights[idx(x, z + 1)]) * 0.25
+			if heights[i2] > avg2 + 0.09:
+				heights[i2] = lerpf(heights[i2], avg2 + 0.06, 0.65)
 
 
 func _generate_rivers() -> void:
@@ -836,6 +852,16 @@ func find_settlement_sites(count: int, min_dist: float = 22.0) -> Array:
 			var h := heights[idx(x, z)]
 			if h < sea_level + 0.008:
 				continue
+			# уклон площадки 7x7: поселение не ставим на пики и крутые склоны
+			var relief := 0.0
+			var fp := 3
+			for dz in range(-fp, fp + 1):
+				for dx in range(-fp, fp + 1):
+					var hh := heights[idx(clampi(x + dx, 0, size - 1), clampi(z + dz, 0, size - 1))]
+					var dev := absf(hh - h)
+					relief = maxf(relief, dev)
+			if relief > 0.052:
+				continue
 			var rough := 0.0
 			for dz in [-1, 0, 1]:
 				for dx in [-1, 0, 1]:
@@ -843,6 +869,7 @@ func find_settlement_sites(count: int, min_dist: float = 22.0) -> Array:
 			if rough > 0.13:
 				continue
 			var score := 0.0
+			score += clampf(1.0 - relief * 20.0, 0.0, 1.0) * 3.2
 			# вода рядом
 			var fresh := false
 			var coast := false
