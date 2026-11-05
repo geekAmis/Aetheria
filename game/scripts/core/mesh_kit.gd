@@ -256,21 +256,77 @@ static func rock_mesh() -> ArrayMesh:
 
 
 static func person_mesh() -> ArrayMesh:
+	return person_mesh_variant(0)
+
+
+static func person_mesh_variant(variant: int) -> ArrayMesh:
+	var v := posmod(variant, 8)
 	var st := _st()
+	var body_h := 0.72 + float(v % 3) * 0.055
+	var body_r := 0.23 + float((v / 3) % 3) * 0.018
+	var head_r := 0.19 + float((v + 1) % 3) * 0.017
+	var leg_h := 0.58 + float(v % 2) * 0.05
+	var skin := Color("#f2ddc8").lerp(Color("#d8b48c"), float((v * 3) % 5) / 5.0)
+	var hair_col: Color = [Color("#4a4038"), Color("#2a2320"), Color("#a07040"), Color("#d8c8a0"), Color("#6a4a30"), Color("#3a3028")][v % 6]
 	# ноги
-	cylinder(st, Vector3(-0.12, 0, 0), 0.075, 0.62, Color("#43474e"), 5)
-	cylinder(st, Vector3(0.12, 0, 0), 0.075, 0.62, Color("#43474e"), 5)
+	cylinder(st, Vector3(-0.12, 0, 0), 0.075, leg_h, Color("#43474e"), 5)
+	cylinder(st, Vector3(0.12, 0, 0), 0.075, leg_h, Color("#43474e"), 5)
 	# тело
-	cylinder(st, Vector3(0, 0.55, 0), 0.26, 0.78, Color("#e8e8e8"), 6, 0.22)
+	cylinder(st, Vector3(0, 0.55, 0), body_r, body_h, Color("#e8e8e8"), 6, 0.22)
 	# руки
-	cylinder(st, Vector3(-0.27, 0.62, 0), 0.065, 0.58, Color("#d8d8d8"), 4)
-	cylinder(st, Vector3(0.27, 0.62, 0), 0.065, 0.58, Color("#d8d8d8"), 4)
+	cylinder(st, Vector3(-body_r - 0.02, 0.62, 0), 0.065, 0.56, Color("#d8d8d8"), 4)
+	cylinder(st, Vector3(body_r + 0.02, 0.62, 0), 0.065, 0.56, Color("#d8d8d8"), 4)
 	# голова
-	sphere(st, Vector3(0, 1.55, 0), 0.22, Color("#f2ddc8"), 8, 5)
-	# волосы/капюшон
-	sphere(st, Vector3(0, 1.63, -0.02), 0.23, Color("#4a4038"), 7, 3, Vector3(1, 0.62, 1))
+	sphere(st, Vector3(0, 1.52 + (body_h - 0.72), 0), head_r, skin, 8, 5)
+	var hy := 1.60 + (body_h - 0.72)
+	match v % 6:
+		0:
+			sphere(st, Vector3(0, hy, -0.02), head_r + 0.01, hair_col, 7, 3, Vector3(1, 0.62, 1))
+		1:
+			cone(st, Vector3(0, hy + 0.04, 0), head_r * 0.95, 0.24, hair_col, 7)
+		2:
+			sphere(st, Vector3(0, hy + 0.01, 0), head_r + 0.015, hair_col, 7, 4, Vector3(1, 0.85, 1))
+			cylinder(st, Vector3(0, hy - 0.16, -head_r * 0.7), head_r * 0.55, 0.3, hair_col, 5)
+		3:
+			pass  # лысый
+		4:
+			cylinder(st, Vector3(0, hy, 0), head_r * 0.75, 0.10, hair_col, 7)
+			sphere(st, Vector3(0, hy + 0.12, 0), head_r * 0.5, hair_col, 6, 3)
+		5:
+			cone(st, Vector3(-head_r * 0.7, hy + 0.02, 0), 0.05, 0.26, hair_col, 5)
+			cone(st, Vector3(head_r * 0.7, hy + 0.02, 0), 0.05, 0.26, hair_col, 5)
+	# аксессуары по варианту
+	if v == 2 or v == 5:
+		# плащ
+		box(st, Vector3(0, 0.85, -body_r - 0.05), Vector3(body_r * 1.9, 0.7, 0.05), Color("#8a3a34"))
+	if v == 4 or v == 7:
+		# посох
+		cylinder(st, Vector3(body_r + 0.18, 0, 0.1), 0.025, 1.55, Color("#6a4a2a"), 5)
+		sphere(st, Vector3(body_r + 0.18, 1.58, 0.1), 0.07, Color("#d8c060"), 6, 3)
+	if v == 3 or v == 6:
+		# наплечники
+		box(st, Vector3(-body_r - 0.04, 1.12, 0), Vector3(0.16, 0.08, 0.2), Color("#9a9aa2"))
+		box(st, Vector3(body_r + 0.04, 1.12, 0), Vector3(0.16, 0.08, 0.2), Color("#9a9aa2"))
+	if v == 1 or v == 6:
+		# сумка
+		box(st, Vector3(body_r + 0.14, 0.62, 0.02), Vector3(0.14, 0.18, 0.1), Color("#8a6a3a"))
 	# пояс
-	cylinder(st, Vector3(0, 0.56, 0), 0.27, 0.08, Color("#7a5a32"), 6)
+	cylinder(st, Vector3(0, 0.56, 0), body_r + 0.01, 0.08, Color("#7a5a32"), 6)
+	return commit(st)
+
+
+static func accessory_mesh(kind: int) -> ArrayMesh:
+	var st := _st()
+	match posmod(kind, 4):
+		0:
+			box(st, Vector3(0, 0, 0), Vector3(0.34, 0.26, 0.2), Color("#8a6a3a"))
+		1:
+			cylinder(st, Vector3(0, 0, 0), 0.05, 1.4, Color("#6a4a2a"), 5)
+			sphere(st, Vector3(0, 1.4, 0), 0.09, Color("#d8c060"), 6, 3)
+		2:
+			box(st, Vector3(0, 0, 0), Vector3(0.5, 0.1, 0.12), Color("#9aa0a8"))
+		_:
+			box(st, Vector3(0, 0, 0), Vector3(0.22, 0.34, 0.22), Color("#5a7a9a"))
 	return commit(st)
 
 
