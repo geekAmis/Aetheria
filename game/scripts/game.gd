@@ -38,6 +38,7 @@ var stroke_tool := ""
 var hover_cell := Vector2i(-1, -1)
 var hover_timer := 0.0
 var hud_timer := 0.0
+var last_hud_us := 0
 var sky_timer := 0.0
 var autosave_timer := 180.0
 var save_dirty := true
@@ -370,6 +371,10 @@ func _finish_start() -> void:
 func _process(delta: float) -> void:
 	if sim == null or world == null:
 		return
+	if terrain_view != null:
+		terrain_view.skip_budget = false
+	if creature_view != null:
+		creature_view.skip_sync = false
 	play_seconds += delta
 	if hud != null and hud.is_modal_open():
 		pass
@@ -392,6 +397,13 @@ func _process(delta: float) -> void:
 			if save_dirty and sim.total_population > 0:
 				save_to_slot(0, true)
 				save_dirty = false
+	# если день был тяжёлым, пропускаем тяжёлые пересборки в этом кадре
+	if sim.heavy_step_fresh:
+		if terrain_view != null:
+			terrain_view.skip_budget = true
+		if creature_view != null:
+			creature_view.skip_sync = true
+		sim.heavy_step_fresh = false
 	# кисть
 	if stroke_active and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not _over_ui():
 		stroke_last += delta
@@ -430,11 +442,13 @@ func _process(delta: float) -> void:
 func _update_hud() -> void:
 	if hud == null:
 		return
+	var t0 := Time.get_ticks_usec()
 	hud.update_top(sim.date_text(), sim.season_text(), sim.total_population, _alive_settlements(), _world_era(), essence, sandbox, speed, paused)
 	hud.update_essence(essence, sandbox)
 	hud.update_hover(hover_cell, world)
 	hud.refresh_inspector()
 	hud.stats_changed()
+	last_hud_us = Time.get_ticks_usec() - t0
 
 
 func _world_era() -> int:

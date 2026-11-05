@@ -25,6 +25,8 @@ var ring_mat: StandardMaterial3D
 var pulse := 0.0
 var anim_time := 0.0
 var label_timer := 0.0
+var last_sync_us := 0
+var skip_sync := false
 
 var emotion_colors := {
 	"neutral": Color("#c8c8c8"),
@@ -147,11 +149,17 @@ func setup(p_world: WorldModel, p_sim: SimWorld) -> void:
 func _process(delta: float) -> void:
 	if sim == null:
 		return
+	if skip_sync:
+		last_sync_us = 0
+		_update_selection(delta)
+		return
+	var t0 := Time.get_ticks_usec()
 	anim_time += delta
 	if slots_dirty:
 		rebuild_slots()
 	_sync_agents(delta)
 	_sync_animals()
+	last_sync_us = Time.get_ticks_usec() - t0
 	_update_selection(delta)
 
 

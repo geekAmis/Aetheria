@@ -262,8 +262,9 @@ func _generate_heights(preset: Dictionary) -> void:
 			var plain_n := (_warp.get_noise_2d(x * 0.35 + 9000.0, z * 0.35 + 9000.0) + 1.0) * 0.5
 			var plain_mask := smoothstep(0.52, 0.82, plain_n)
 			if plain_mask > 0.001:
-				var base := 0.40 + (_noise3.get_noise_2d(x * 0.4, z * 0.4) * 0.5 + 0.5) * 0.10
-				h = lerpf(h, base, plain_mask * 0.62)
+				h -= _noise3.get_noise_2d(x, z) * 0.012 * plain_mask
+				var base := clampf(cont * 0.55 + 0.24, 0.05, 0.95)
+				h = lerpf(h, base, plain_mask * 0.60)
 				# террасы в поймах
 				h = lerpf(h, roundf(h * 48.0) / 48.0, plain_mask * 0.35)
 			heights[idx(x, z)] = clampf(h, 0.0, 1.0)

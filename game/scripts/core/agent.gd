@@ -293,7 +293,9 @@ static func from_dict(d: Dictionary) -> AgentData:
 	a.partner_id = int(d.get("partner_id", -1))
 	a.pregnant = float(d.get("pregnant", 0))
 	a.father_id = int(d.get("father_id", -1))
-	a.children = d.get("children", [])
+	a.children = []
+	for ch in d.get("children", []):
+		a.children.append(int(ch))
 	a.equipment = int(d.get("equipment", 0))
 	a.kills = int(d.get("kills", 0))
 	a.born_year = int(d.get("born_year", 0))
@@ -316,7 +318,10 @@ static func from_dict(d: Dictionary) -> AgentData:
 	a.unkillable = bool(d.get("unkillable", false))
 	a.favourite = bool(d.get("favourite", false))
 	a.appearance = d.get("appearance", {}).duplicate()
-	a.bonds = d.get("bonds", {}).duplicate()
+	a.bonds = {}
+	var bd: Dictionary = d.get("bonds", {})
+	for k in bd:
+		a.bonds[int(k)] = float(bd[k])
 	var hp: Array = d.get("home_pos", [a.pos.x, a.pos.y])
 	a.home_pos = Vector2(float(hp[0]), float(hp[1]))
 	return a

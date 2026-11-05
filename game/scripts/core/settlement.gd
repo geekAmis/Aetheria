@@ -273,9 +273,16 @@ static func from_dict(d: Dictionary) -> SettlementData:
 	s.faith = float(d.get("faith", 5))
 	s.happiness = float(d.get("happiness", 8))
 	s.stability = float(d.get("stability", 65))
-	s.wars = d.get("wars", []).duplicate()
-	s.allies = d.get("allies", []).duplicate()
-	s.relations = d.get("relations", {}).duplicate()
+	s.wars = []
+	for w in d.get("wars", []):
+		s.wars.append(int(w))
+	s.allies = []
+	for al in d.get("allies", []):
+		s.allies.append(int(al))
+	s.relations = {}
+	var rels: Dictionary = d.get("relations", {})
+	for k in rels:
+		s.relations[int(k)] = float(rels[k])
 	s.war_target = int(d.get("war_target", -1))
 	s.war_days = int(d.get("war_days", 0))
 	s.siege_days = int(d.get("siege_days", 0))
@@ -297,7 +304,15 @@ static func from_dict(d: Dictionary) -> SettlementData:
 	var wc: Array = d.get("water_cell", [-1, -1])
 	s.water_cell = Vector2i(int(wc[0]), int(wc[1]))
 	s.water_day = int(d.get("water_day", -999))
-	s.known = d.get("known", {}).duplicate()
-	s.roads = d.get("roads", {}).duplicate(true)
+	s.known = {}
+	var kn: Dictionary = d.get("known", {})
+	for k in kn:
+		s.known[int(k)] = bool(kn[k])
+	s.roads = {}
+	var rd: Dictionary = d.get("roads", {})
+	for k in rd:
+		var rr: Dictionary = rd[k]
+		rr["to"] = int(rr.get("to", k))
+		s.roads[int(k)] = rr
 	s.color = D.race(s.race_id).get("color_c", Color.WHITE)
 	return s

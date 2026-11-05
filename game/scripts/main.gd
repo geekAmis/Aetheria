@@ -39,6 +39,7 @@ var profile_times: Array = []
 var profile_cell := Vector2i.ZERO
 var profile_brush := true
 var profile_warmup := 0
+var profile_slow: Array = []
 var menu_config: Dictionary = {}
 var selected_preset := "continent"
 var size_choice := 256
@@ -177,6 +178,17 @@ func _do_action(action: String) -> void:
 			game.sim.earthquake(s.center.x, s.center.y, 16.0)
 		"tribe":
 			game.sim.spawn_tribe(s.center.x + 20, s.center.y + 10)
+		"inspect_first":
+			for aa in game.sim.agents:
+				if aa.alive:
+					game.selected_agent_id = aa.id
+					game.selected_settlement_id = -1
+					game.sim.selected_settlement_id = -1
+					game.creature_view.set_selected(aa.id)
+					game.hud.inspect_agent(aa)
+					break
+		"inspect_settlement":
+			game.select_settlement(s.id)
 		"save":
 			game.save_to_slot(2, false)
 		"banner":
@@ -194,6 +206,16 @@ func _process(delta: float) -> void:
 			profile_warmup -= 1
 			return
 		profile_times.append(delta)
+		if delta > 0.033:
+			var views := {
+				"terrain": game.terrain_view.last_frame_us,
+				"nature": game.nature_view.last_frame_us,
+				"creature": game.creature_view.last_sync_us,
+				"hud": game.last_hud_us,
+				"settle_rebuild": game.settlement_view.last_rebuild_us,
+				"roads": game.settlement_view.last_roads_us
+			}
+			profile_slow.append([profile_frames, snappedf(delta * 1000.0, 0.1), str(game.sim.last_parts), str(views)])
 		if profile_frames % 6 == 0 and profile_brush:
 			game.world.raise_area(profile_cell.x, profile_cell.y, 16, 0.01, "add")
 		profile_frames -= 1
@@ -207,6 +229,8 @@ func _process(delta: float) -> void:
 			print("[profile] frames=%d p50=%.1fms p95=%.1fms max=%.1fms fps_avg=%.1f" % [n, p50 * 1000.0, p95 * 1000.0, mx * 1000.0, 1.0 / maxf(0.0001, _avg(profile_times))])
 			var ok := p95 <= 0.020 and mx <= 0.033
 			print("[profile] %s p95<=20ms max<=33ms" % ["PASS" if ok else "FAIL"])
+			if not profile_slow.is_empty():
+				print("[profile] slow frames=", str(profile_slow))
 	if bench_seconds > 0.0:
 		if game != null and game.speed < 20.0:
 			game.set_speed(20.0)
@@ -220,7 +244,23 @@ func _process(delta: float) -> void:
 				for a in game.sim.agents:
 					acts[a.action] = int(acts.get(a.action, 0)) + 1
 					emos[a.emotion] = int(emos.get(a.emotion, 0)) + 1
-				print("[bench] fps=%d day=%d pop=%d agents=%d nodes=%d actions=%s emotions=%s" % [int(Engine.get_frames_per_second()), int(game.sim.day), game.sim.total_population, game.sim.agents.size(), get_tree().get_node_count(), str(acts), str(emos)])
+				var steep := 0
+				var roads := 0
+				for s2 in game.sim.settlements:
+					if s2.destroyed:
+						continue
+					for oid in s2.roads:
+						if float(s2.roads[oid].get("progress", 0.0)) >= 1.0:
+							roads += 1
+					var h0 := game.world.heights[game.world.idx(s2.center.x, s2.center.y)]
+					var relief := 0.0
+					for dz in range(-3, 4):
+						for dx in range(-3, 4):
+							var hh := game.world.heights[game.world.idx(clampi(s2.center.x + dx, 0, game.world.size - 1), clampi(s2.center.y + dz, 0, game.world.size - 1))]
+							relief = maxf(relief, absf(hh - h0))
+					if relief > 0.052:
+						steep += 1
+				print("[bench] fps=%d day=%d pop=%d agents=%d nodes=%d steep=%d roads=%d exp=%d actions=%s emotions=%s" % [int(Engine.get_frames_per_second()), int(game.sim.day), game.sim.total_population, game.sim.agents.size(), get_tree().get_node_count(), steep, roads, game.sim.expeditions.size(), str(acts), str(emos)])
 		if bench_seconds <= 0.0:
 			get_tree().quit()
 	if shot_timer > 0.0:
@@ -287,6 +327,10 @@ func _parse_args() -> void:
 					i += 1
 			"--hidenature":
 				shot_hide_nature = true
+			"--shot-action":
+				if i + 1 < args.size():
+					shot_action = args[i + 1]
+					i += 1
 			"--hidewater":
 				shot_hide_water = true
 			"--sim-years":

@@ -86,6 +86,10 @@ var chronicle_rows: VBoxContainer
 var ui_scale := 1.0
 var stats_refresh := 0.0
 var last_hover_cell := Vector2i(-1, -1)
+var live_action_chip: PanelContainer
+var live_emotion_chip: PanelContainer
+var live_carry_chip: PanelContainer
+var live_immortal_chip: PanelContainer
 
 
 func setup(p_game: GameSession) -> void:
@@ -636,7 +640,7 @@ func refresh_inspector() -> void:
 	if a != null and a.alive:
 		kind = "agent"
 		id = a.id
-		sig = "a%d|%d|%d|%d|%d|%d|%d|%s|%d|%d|%s|%s|%d|%s|%d" % [a.id, a.level, int(a.age), int(a.health / maxf(1.0, a.max_health) * 20), int(a.satiety / 10), int(a.thirst / 10), int(a.mood / 10), a.role, int(a.pregnant / 20), a.partner_id, a.action, a.emotion, int(a.immortal), a.carrying, a.perks.size()]
+		sig = "a%d|%d|%d|%d|%d|%d|%d|%s|%d|%d|%d" % [a.id, a.level, int(a.age), int(a.health / maxf(1.0, a.max_health) * 20), int(a.satiety / 10), int(a.thirst / 10), int(a.mood / 10), a.role, int(a.pregnant / 20), a.partner_id, a.perks.size()]
 	elif s != null:
 		kind = "settlement"
 		id = s.id
@@ -646,6 +650,8 @@ func refresh_inspector() -> void:
 		kind = "cell"
 		sig = "c%d_%d_%d" % [inspector_cell.x, inspector_cell.y, world.biome_id_at(inspector_cell.x, inspector_cell.y)]
 	if sig == inspector_sig and kind == inspector_kind and id == inspector_id:
+		if kind == "agent" and a != null:
+			_refresh_agent_live(a)
 		return
 	inspector_sig = sig
 	inspector_kind = kind
@@ -700,20 +706,16 @@ func _build_agent_card(a: AgentData) -> void:
 		chips.add_child(_chip(s.name, s.color))
 	panel_content.add_child(chips)
 	var chips2 := _hbox(4)
-	var act_txt: String = L.t("action_" + a.action)
-	if act_txt == "action_" + a.action:
-		act_txt = a.action
-	chips2.add_child(_chip("▶ " + act_txt, action_icon_color(a.action)))
-	if a.emotion != "neutral":
-		var emo_txt: String = L.t("emotion_" + a.emotion)
-		if emo_txt == "emotion_" + a.emotion:
-			emo_txt = a.emotion
-		chips2.add_child(_chip(emo_txt, emotion_color(a.emotion)))
-	if not a.carrying.is_empty():
-		chips2.add_child(_chip("↦ " + a.carrying, ThemeBuilder.TEAL))
-	if a.immortal:
-		chips2.add_child(_chip("∞ " + L.t("immortal"), Color("#9ad8ff")))
+	live_action_chip = _chip("", ThemeBuilder.MUTED)
+	chips2.add_child(live_action_chip)
+	live_emotion_chip = _chip("", ThemeBuilder.MUTED)
+	chips2.add_child(live_emotion_chip)
+	live_carry_chip = _chip("", ThemeBuilder.TEAL)
+	chips2.add_child(live_carry_chip)
+	live_immortal_chip = _chip("∞ " + L.t("immortal"), Color("#9ad8ff"))
+	chips2.add_child(live_immortal_chip)
 	panel_content.add_child(chips2)
+	_refresh_agent_live(a)
 	panel_content.add_child(_hairline())
 
 	var hp := _bar("HP", a.health, a.max_health, Color("#c85048"))
@@ -810,6 +812,33 @@ func _build_agent_card(a: AgentData) -> void:
 
 func _perk_name(p: String) -> String:
 	return {"tough": "Крепыш", "industrious": "Трудяга", "genius": "Мудрец", "charmer": "Обаятельный", "swift": "Быстрый", "lucky": "Удачливый", "brave": "Смельчак", "curious": "Любопытный", "frugal": "Бережливый", "pious": "Благочестивый"}.get(p, p)
+
+
+func _set_chip(p: PanelContainer, text: String, color: Color) -> void:
+	if p == null or not is_instance_valid(p):
+		return
+	var l := p.get_child(0) as Label
+	if l != null:
+		l.text = text
+		l.add_theme_color_override("font_color", color)
+	p.add_theme_stylebox_override("panel", ThemeBuilder.style(Color(color.r, color.g, color.b, 0.12), Color(color.r, color.g, color.b, 0.35), 10, 1, 7))
+
+
+func _refresh_agent_live(a: AgentData) -> void:
+	var act_txt: String = L.t("action_" + a.action)
+	if act_txt == "action_" + a.action:
+		act_txt = a.action
+	_set_chip(live_action_chip, "▶ " + act_txt, action_icon_color(a.action))
+	var emo_txt: String = L.t("emotion_" + a.emotion)
+	if emo_txt == "emotion_" + a.emotion:
+		emo_txt = a.emotion
+	live_emotion_chip.visible = a.emotion != "neutral" and a.emotion_timer > 0.0
+	if live_emotion_chip.visible:
+		_set_chip(live_emotion_chip, emo_txt, emotion_color(a.emotion))
+	live_carry_chip.visible = not a.carrying.is_empty()
+	if live_carry_chip.visible:
+		_set_chip(live_carry_chip, "↦ " + a.carrying, ThemeBuilder.TEAL)
+	live_immortal_chip.visible = a.immortal
 
 
 func action_icon_color(a: String) -> Color:

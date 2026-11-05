@@ -15,6 +15,8 @@ var road_root: Node3D
 var road_sig := ""
 var road_mesh: BoxMesh
 var road_mat: StandardMaterial3D
+var last_rebuild_us := 0
+var last_roads_us := 0
 
 
 func setup(p_world: WorldModel, p_sim: SimWorld, p_camera: CameraRig = null) -> void:
@@ -86,6 +88,7 @@ func _on_structure_changed(id: int) -> void:
 
 
 func _rebuild_settlement(s: SettlementData, data: Dictionary) -> void:
+	var t0 := Time.get_ticks_usec()
 	var n: Node3D = data.root
 	# кольцо территории
 	if data.ring != null:
@@ -172,6 +175,7 @@ func _rebuild_settlement(s: SettlementData, data: Dictionary) -> void:
 	data.signature = _signature(s)
 	# строительная площадка
 	_update_construction(s, data)
+	last_rebuild_us = Time.get_ticks_usec() - t0
 
 
 func _add_flame(data: Dictionary, pos: Vector3, s: SettlementData) -> void:
@@ -390,14 +394,16 @@ func _process(delta: float) -> void:
 
 
 func _rebuild_roads() -> void:
+	var tr0 := Time.get_ticks_usec()
 	var sig := ""
 	for s in sim.settlements:
 		if s.destroyed:
 			continue
 		for oid in s.roads:
 			var r: Dictionary = s.roads[oid]
-			sig += "%d:%d:%.2f:%d;" % [s.id, oid, float(r.get("progress", 0.0)), int(r.get("segments", []).size())]
+			sig += "%d:%d:%.2f:%d;" % [s.id, int(oid), float(r.get("progress", 0.0)), int(r.get("segments", []).size())]
 	if sig == road_sig:
+		last_roads_us = Time.get_ticks_usec() - tr0
 		return
 	road_sig = sig
 	for c in road_root.get_children():
@@ -422,6 +428,7 @@ func _rebuild_roads() -> void:
 					dir = dd.normalized()
 				transforms.append([x, z, atan2(dir.x, dir.y)])
 	if transforms.is_empty():
+		last_roads_us = Time.get_ticks_usec() - tr0
 		return
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -441,6 +448,7 @@ func _rebuild_roads() -> void:
 	mmi.material_override = road_mat
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	road_root.add_child(mmi)
+	last_roads_us = Time.get_ticks_usec() - tr0
 
 
 func select(id: int) -> void:

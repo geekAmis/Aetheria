@@ -53,6 +53,9 @@ var selected_settlement_id: int = -1
 var bulk_mode := false
 var expeditions: Array = []
 var next_expedition_id: int = 1
+var last_step_us: int = 0
+var last_parts: Dictionary = {}
+var heavy_step_fresh := false
 
 
 func setup(p_world: WorldModel, p_config: Dictionary) -> void:
@@ -148,27 +151,36 @@ func populate(progress: Callable = Callable()) -> void:
 # ------------------------------------------------------------------ main tick
 
 func step_day() -> void:
+	var t0 := Time.get_ticks_usec()
 	day += 1.0
 	year = 1 + int(day / 365.0)
 	season = int(fposmod(day, 365.0) / 91.25)
 	if nuclear_winter > 0.0:
 		nuclear_winter = maxf(0.0, nuclear_winter - 1.0)
 	_refresh_weather()
-	_world_daily()
+	_time_part("world", func(): _world_daily())
 	_update_settlement_counts()
-	_agents_daily()
-	_settlements_daily()
-	_animals_daily()
-	_diplomacy_daily()
-	_roads_tick()
-	_expeditions_daily()
-	_fire_daily()
-	_radiation_daily()
-	_random_events_daily()
+	_time_part("agents", func(): _agents_daily())
+	_time_part("settle", func(): _settlements_daily())
+	_time_part("animals", func(): _animals_daily())
+	_time_part("diplo", func(): _diplomacy_daily())
+	_time_part("roads", func(): _roads_tick())
+	_time_part("exp", func(): _expeditions_daily())
+	_time_part("fire", func(): _fire_daily())
+	_time_part("rad", func(): _radiation_daily())
+	_time_part("events", func(): _random_events_daily())
 	if year != world_age_years:
 		world_age_years = year
-		_yearly()
+		_time_part("yearly", func(): _yearly())
 	war_intensity = clampf(float(_active_wars_count()) / 2.0, 0.0, 1.0)
+	last_step_us = Time.get_ticks_usec() - t0
+	heavy_step_fresh = last_step_us > 5000
+
+
+func _time_part(key: String, cb: Callable) -> void:
+	var t := Time.get_ticks_usec()
+	cb.call()
+	last_parts[key] = Time.get_ticks_usec() - t
 
 
 func _refresh_weather() -> void:
@@ -198,22 +210,25 @@ func _active_wars_count() -> int:
 
 
 func _world_daily() -> void:
-	# рост растительности — 1/8 карты в день
-	var offset := int(day) % 8
+	# рост растительности — 1/12 карты в день
+	var offset := int(day) % 12
 	var n := world.n()
 	var fert := world.fertility
-	for i in range(offset, n, 8):
-		if world.water[i] > 0.0004:
+	var veg := world.vegetation
+	var water := world.water
+	var moist := world.moisture
+	var temp := world.temperature
+	var winter := nuclear_winter > 0.0
+	for i in range(offset, n, 12):
+		if water[i] > 0.0004:
 			continue
 		var cap: float = float(fert[i]) * 1.05
-		var v := world.vegetation[i]
+		var v := veg[i]
 		if v < cap:
-			var temp_f := 1.0
-			if world.temperature[i] < 0.12:
-				temp_f = 0.3
-			if nuclear_winter > 0.0:
+			var temp_f := 0.3 if temp[i] < 0.12 else 1.0
+			if winter:
 				temp_f *= 0.35
-			world.vegetation[i] = clampf(v + 0.006 * world.moisture[i] * temp_f, 0.0, 1.0)
+			veg[i] = clampf(v + 0.008 * moist[i] * temp_f, 0.0, 1.0)
 	# тушение пожара дождём
 	if weather_mode == "rain" and burning.size() > 0:
 		var keys := burning.keys()
@@ -796,13 +811,13 @@ func _destroy_settlement(s: SettlementData, reason: String) -> void:
 func _animals_daily() -> void:
 	var newborns: Array = []
 	var dead: Array = []
-	var parity := int(day) % 2
+	var parity := int(day) % 4
 	for an in animals:
 		if not an.alive:
 			continue
-		if int(an.id) % 2 != parity:
+		if int(an.id) % 4 != parity:
 			continue
-		an.age = float(an.age) + 1.0 / 365.0
+		an.age = float(an.age) + 4.0 / 365.0
 		var lifespan := 18.0
 		if an.age > lifespan or rng.randf() < 0.000024:
 			an.alive = false
@@ -818,12 +833,12 @@ func _animals_daily() -> void:
 					an.target = p
 					break
 		# размножение
-		if an.breed_cd <= 0.0 and rng.randf() < float(an.breed) * 0.12:
+		if an.breed_cd <= 0.0 and rng.randf() < float(an.breed) * 0.42:
 			an.breed_cd = 60.0
 			if animals.size() + newborns.size() < animals_cap:
 				newborns.append(an.species)
 		else:
-			an.breed_cd = maxf(0.0, an.breed_cd - 0.5)
+			an.breed_cd = maxf(0.0, an.breed_cd - 1.0)
 		# хищники
 		if bool(an.predator) and rng.randf() < 0.03:
 			var victim: AgentData = _agent_near(an.pos, 1.6)
@@ -932,7 +947,6 @@ func _roads_tick() -> void:
 				var wob := sin(t * 11.0 + float(s.id)) * 1.2
 				segs.append([px + nx * wob, pz + nz * wob])
 			road["segments"] = segs
-			settlement_structure_changed.emit(s.id)
 			if prog >= 1.0:
 				_add_event(s, "road", "Дорога %s — %s завершена" % [s.name, other.name], 2, "road")
 				_add_event(other, "road", "Дорога %s — %s завершена" % [other.name, s.name], 2, "road")
@@ -1094,10 +1108,13 @@ func _fire_daily() -> void:
 
 
 func _radiation_daily() -> void:
-	var offset := int(day) % 12
-	for i in range(offset, world.n(), 12):
-		if world.radiation[i] > 0.0:
-			world.radiation[i] = maxf(0.0, world.radiation[i] - 0.00035)
+	var offset := int(day) % 24
+	var rad := world.radiation
+	var n := world.n()
+	for i in range(offset, n, 24):
+		var r := rad[i]
+		if r > 0.0:
+			rad[i] = maxf(0.0, r - 0.0005)
 
 
 func _random_events_daily() -> void:
@@ -1418,6 +1435,9 @@ func kill_agent(a: AgentData, cause: String) -> void:
 
 
 func _assign_targets(s: SettlementData, local: Array) -> void:
+	# решения принимаются раз в 2 дня на поселение — так поведение стабильнее и дешевле
+	if int(day) % 2 != s.id % 2:
+		return
 	var center := Vector2(s.center)
 	var enemy: SettlementData = settlement_by_id.get(s.war_target, null) if s.war_target >= 0 else null
 	var radius := minf(s.territory_radius * 0.75, 9.0)
