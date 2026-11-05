@@ -47,6 +47,8 @@ var age_sum: float = 0.0
 var prosperity: float = 1.0
 var water_cell: Vector2i = Vector2i(-1, -1)
 var water_day: int = -999
+var known: Dictionary = {}          # id -> true
+var roads: Dictionary = {}          # id -> {progress, segments, condition}
 
 const STAGE_POPS := {"camp": 0, "village": 15, "town": 55, "city": 150, "metropolis": 350}
 const STAGE_RADIUS := {"camp": 7.0, "village": 11.0, "town": 17.0, "city": 25.0, "metropolis": 34.0}
@@ -245,7 +247,8 @@ func to_dict() -> Dictionary:
 		"population": population, "territory_radius": territory_radius,
 		"destroyed": destroyed, "nuked": nuked, "total_births": total_births,
 		"total_deaths": total_deaths, "prosperity": prosperity,
-		"water_cell": [water_cell.x, water_cell.y], "water_day": water_day
+		"water_cell": [water_cell.x, water_cell.y], "water_day": water_day,
+		"known": known, "roads": roads
 	}
 
 
@@ -294,5 +297,7 @@ static func from_dict(d: Dictionary) -> SettlementData:
 	var wc: Array = d.get("water_cell", [-1, -1])
 	s.water_cell = Vector2i(int(wc[0]), int(wc[1]))
 	s.water_day = int(d.get("water_day", -999))
+	s.known = d.get("known", {}).duplicate()
+	s.roads = d.get("roads", {}).duplicate(true)
 	s.color = D.race(s.race_id).get("color_c", Color.WHITE)
 	return s

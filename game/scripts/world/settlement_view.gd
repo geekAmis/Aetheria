@@ -11,6 +11,10 @@ var selected_id: int = -1
 var timer := 0.0
 var flame_mat: StandardMaterial3D
 var ruin_mat: StandardMaterial3D
+var road_root: Node3D
+var road_sig := ""
+var road_mesh: BoxMesh
+var road_mat: StandardMaterial3D
 
 
 func setup(p_world: WorldModel, p_sim: SimWorld, p_camera: CameraRig = null) -> void:
@@ -34,6 +38,14 @@ func setup(p_world: WorldModel, p_sim: SimWorld, p_camera: CameraRig = null) -> 
 	)
 	sim.settlement_structure_changed.connect(_on_structure_changed)
 	sim.settlement_changed.connect(_on_structure_changed)
+	road_root = Node3D.new()
+	road_root.name = "Roads"
+	add_child(road_root)
+	road_mesh = BoxMesh.new()
+	road_mesh.size = Vector3(1.9, 0.09, 1.4)
+	road_mat = StandardMaterial3D.new()
+	road_mat.albedo_color = Color("#6a5638")
+	road_mat.roughness = 1.0
 	for s in sim.settlements:
 		_ensure_node(s)
 
@@ -374,6 +386,61 @@ func _process(delta: float) -> void:
 			if c is MeshInstance3D and c.name == "Flame":
 				var k := 0.75 + sin(Time.get_ticks_msec() * 0.012 + s.id) * 0.18
 				c.scale = Vector3(k, 0.9 + k * 0.25, k)
+	_rebuild_roads()
+
+
+func _rebuild_roads() -> void:
+	var sig := ""
+	for s in sim.settlements:
+		if s.destroyed:
+			continue
+		for oid in s.roads:
+			var r: Dictionary = s.roads[oid]
+			sig += "%d:%d:%.2f:%d;" % [s.id, oid, float(r.get("progress", 0.0)), int(r.get("segments", []).size())]
+	if sig == road_sig:
+		return
+	road_sig = sig
+	for c in road_root.get_children():
+		c.queue_free()
+	# собираем все сегменты в один MultiMesh
+	var transforms: Array = []
+	for s in sim.settlements:
+		if s.destroyed:
+			continue
+		for oid in s.roads:
+			var r: Dictionary = s.roads[oid]
+			var segs: Array = r.get("segments", [])
+			for i in segs.size():
+				var seg: Array = segs[i]
+				var x := float(seg[0])
+				var z := float(seg[1])
+				var dir := Vector2(1, 0)
+				var j := mini(i + 1, segs.size() - 1)
+				var nxt: Array = segs[j]
+				var dd := Vector2(float(nxt[0]) - x, float(nxt[1]) - z)
+				if dd.length() > 0.01:
+					dir = dd.normalized()
+				transforms.append([x, z, atan2(dir.x, dir.y)])
+	if transforms.is_empty():
+		return
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = road_mesh
+	mm.instance_count = transforms.size()
+	var half := world.size * 0.5
+	for i in transforms.size():
+		var tr: Array = transforms[i]
+		var x := float(tr[0])
+		var z := float(tr[1])
+		var wy := world.terrain_y(x, z) + 0.10
+		var basis := Basis(Vector3.UP, float(tr[2]))
+		mm.set_instance_transform(i, Transform3D(basis, Vector3((x - half) * WorldModel.CELL, wy, (z - half) * WorldModel.CELL)))
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "RoadMesh"
+	mmi.multimesh = mm
+	mmi.material_override = road_mat
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	road_root.add_child(mmi)
 
 
 func select(id: int) -> void:

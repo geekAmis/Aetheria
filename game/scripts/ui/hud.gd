@@ -13,6 +13,10 @@ signal load_requested(slot: int)
 signal menu_requested
 signal select_settlement(id: int)
 signal follow_toggled(id: int)
+signal god_agent_action(kind: String)
+signal favourite_toggled(id: int)
+signal rename_agent_requested(id: int)
+signal spawn_requested(kind: String, data: Dictionary)
 signal server_settings_changed
 
 var game: GameSession
@@ -81,6 +85,7 @@ var chronicle_filter := "all"
 var chronicle_rows: VBoxContainer
 var ui_scale := 1.0
 var stats_refresh := 0.0
+var last_hover_cell := Vector2i(-1, -1)
 
 
 func setup(p_game: GameSession) -> void:
@@ -631,7 +636,7 @@ func refresh_inspector() -> void:
 	if a != null and a.alive:
 		kind = "agent"
 		id = a.id
-		sig = "a%d|%d|%d|%d|%d|%d|%d|%s|%d|%d" % [a.id, a.level, int(a.age), int(a.health / maxf(1.0, a.max_health) * 20), int(a.satiety / 10), int(a.thirst / 10), int(a.mood / 10), a.role, int(a.pregnant / 20), a.partner_id]
+		sig = "a%d|%d|%d|%d|%d|%d|%d|%s|%d|%d|%s|%s|%d|%s|%d" % [a.id, a.level, int(a.age), int(a.health / maxf(1.0, a.max_health) * 20), int(a.satiety / 10), int(a.thirst / 10), int(a.mood / 10), a.role, int(a.pregnant / 20), a.partner_id, a.action, a.emotion, int(a.immortal), a.carrying, a.perks.size()]
 	elif s != null:
 		kind = "settlement"
 		id = s.id
@@ -694,6 +699,21 @@ func _build_agent_card(a: AgentData) -> void:
 	if s != null:
 		chips.add_child(_chip(s.name, s.color))
 	panel_content.add_child(chips)
+	var chips2 := _hbox(4)
+	var act_txt: String = L.t("action_" + a.action)
+	if act_txt == "action_" + a.action:
+		act_txt = a.action
+	chips2.add_child(_chip("▶ " + act_txt, action_icon_color(a.action)))
+	if a.emotion != "neutral":
+		var emo_txt: String = L.t("emotion_" + a.emotion)
+		if emo_txt == "emotion_" + a.emotion:
+			emo_txt = a.emotion
+		chips2.add_child(_chip(emo_txt, emotion_color(a.emotion)))
+	if not a.carrying.is_empty():
+		chips2.add_child(_chip("↦ " + a.carrying, ThemeBuilder.TEAL))
+	if a.immortal:
+		chips2.add_child(_chip("∞ " + L.t("immortal"), Color("#9ad8ff")))
+	panel_content.add_child(chips2)
 	panel_content.add_child(_hairline())
 
 	var hp := _bar("HP", a.health, a.max_health, Color("#c85048"))
@@ -744,6 +764,38 @@ func _build_agent_card(a: AgentData) -> void:
 	if fam != "":
 		panel_content.add_child(_lbl(fam, "Small", ThemeBuilder.MUTED, 11))
 	panel_content.add_child(_hairline())
+	var god := _hbox(4)
+	var heal_b := _button("Исцелить", "GhostButton")
+	heal_b.add_theme_font_size_override("font_size", 11)
+	heal_b.pressed.connect(func(): god_agent_action.emit("heal"))
+	god.add_child(heal_b)
+	var bless_b := _button("Благословить", "GhostButton")
+	bless_b.add_theme_font_size_override("font_size", 11)
+	bless_b.pressed.connect(func(): god_agent_action.emit("bless"))
+	god.add_child(bless_b)
+	var scare_b := _button("Напугать", "GhostButton")
+	scare_b.add_theme_font_size_override("font_size", 11)
+	scare_b.pressed.connect(func(): god_agent_action.emit("scare"))
+	god.add_child(scare_b)
+	panel_content.add_child(god)
+	var god2 := _hbox(4)
+	var reward_b := _button("Наградить", "GhostButton")
+	reward_b.add_theme_font_size_override("font_size", 11)
+	reward_b.pressed.connect(func(): god_agent_action.emit("reward"))
+	god2.add_child(reward_b)
+	var imm_b := _button("Бессмертие", "GhostButton")
+	imm_b.add_theme_font_size_override("font_size", 11)
+	imm_b.pressed.connect(func(): god_agent_action.emit("immortal"))
+	god2.add_child(imm_b)
+	var perk_b := _button("Перк", "GhostButton")
+	perk_b.add_theme_font_size_override("font_size", 11)
+	perk_b.pressed.connect(func(): god_agent_action.emit("perk_tough"))
+	god2.add_child(perk_b)
+	var fav_b := _button("★" if a.favourite else "☆", "GhostButton")
+	fav_b.add_theme_font_size_override("font_size", 11)
+	fav_b.pressed.connect(func(): favourite_toggled.emit(a.id))
+	god2.add_child(fav_b)
+	panel_content.add_child(god2)
 	var actions := _hbox(4)
 	var center_b := _button("В центр", "GhostButton")
 	center_b.add_theme_font_size_override("font_size", 12)
@@ -758,6 +810,24 @@ func _build_agent_card(a: AgentData) -> void:
 
 func _perk_name(p: String) -> String:
 	return {"tough": "Крепыш", "industrious": "Трудяга", "genius": "Мудрец", "charmer": "Обаятельный", "swift": "Быстрый", "lucky": "Удачливый", "brave": "Смельчак", "curious": "Любопытный", "frugal": "Бережливый", "pious": "Благочестивый"}.get(p, p)
+
+
+func action_icon_color(a: String) -> Color:
+	return {
+		"hunt": Color("#d86a3a"), "haul": Color("#b08a4a"), "eat": Color("#e0b04a"),
+		"drink": Color("#4aa8d8"), "sleep": Color("#7a7ad8"), "work": Color("#c8c8a0"),
+		"build": Color("#e0c060"), "socialize": Color("#e08ac8"), "pray": Color("#c8a8e0"),
+		"play": Color("#8ad8e0"), "flee": Color("#b06ad8"), "march": Color("#c85048"),
+		"gather": Color("#d8a04a"), "siege": Color("#c85048"), "explore": Color("#6ac8d8")
+	}.get(a, ThemeBuilder.MUTED)
+
+
+func emotion_color(e: String) -> Color:
+	return {
+		"happy": Color("#ffd86a"), "sad": Color("#6a9ad8"), "angry": Color("#e05545"),
+		"afraid": Color("#a06ad8"), "hungry": Color("#e08a3a"), "proud": Color("#6ad8a0"),
+		"grieving": Color("#8a8ad8")
+	}.get(e, ThemeBuilder.MUTED)
 
 
 func _build_settlement_card(s: SettlementData) -> void:
@@ -783,6 +853,14 @@ func _build_settlement_card(s: SettlementData) -> void:
 	if s.blizzard > 0: chips.add_child(_chip("Метель", Color("#8ac8e0")))
 	if s.blessed > 0: chips.add_child(_chip("Благословение", ThemeBuilder.GOLD))
 	if s.cursed > 0: chips.add_child(_chip("Проклятие", Color("#a06ad8")))
+	var roads_done := 0
+	for oid in s.roads:
+		if float(s.roads[oid].get("progress", 0.0)) >= 1.0:
+			roads_done += 1
+	if roads_done > 0:
+		chips.add_child(_chip("Дорог: %d" % roads_done, Color("#b0a06b")))
+	if not s.known.is_empty():
+		chips.add_child(_chip("Знакомы: %d" % s.known.size(), ThemeBuilder.MUTED))
 	panel_content.add_child(chips)
 	# лидер
 	var leader: AgentData = sim.agent_by_id.get(s.leader_id, null)
@@ -856,6 +934,22 @@ func _build_settlement_card(s: SettlementData) -> void:
 	actions.add_child(_small_action("Чудо", func(): game._apply_tool("miracle", s.center, true)))
 	actions.add_child(_small_action("Озарение", func(): game._apply_tool("tech_boon", s.center, true)))
 	panel_content.add_child(actions)
+	var actions2 := _hbox(3)
+	if s.war_target >= 0:
+		actions2.add_child(_small_action("Мир", func():
+			var o: SettlementData = sim.settlement_by_id.get(s.war_target, null)
+			if o != null:
+				sim.make_peace(s, o, false)
+		))
+	else:
+		actions2.add_child(_small_action("Война", func():
+			var o: SettlementData = sim._nearest_other(s, 60.0)
+			if o != null:
+				sim.declare_war(s, o, "god")
+		))
+	actions2.add_child(_small_action("Лидер", func(): game._apply_tool("new_leader", s.center, true)))
+	actions2.add_child(_small_action("Пророк", func(): game._apply_tool("prophet", s.center, true)))
+	panel_content.add_child(actions2)
 
 
 func _small_action(text: String, cb: Callable) -> Button:
@@ -1071,11 +1165,72 @@ func _build_world_tab() -> void:
 		shown += 1
 		if shown >= 8:
 			break
+	var spawn_row := _hbox(4)
+	var c1 := _button("+ Существо", "GoldButton")
+	c1.add_theme_font_size_override("font_size", 11)
+	c1.pressed.connect(func(): open_spawn_dialog("creature"))
+	spawn_row.add_child(c1)
+	var c2 := _button("+ Животное", "GhostButton")
+	c2.add_theme_font_size_override("font_size", 11)
+	c2.pressed.connect(func(): open_spawn_dialog("animal"))
+	spawn_row.add_child(c2)
+	panel_content.add_child(spawn_row)
 	world_sig = "%d_%d_%d" % [sim.year, sim.total_population, sim.settlements.size()]
 
 
-func stats_changed() -> void:
-	if panel_tab == "world":
+func open_spawn_dialog(kind: String) -> void:
+	var creature := kind == "creature"
+	_open_modal("Создать существо" if creature else "Создать животное", "spawn")
+	var species_ids: Array = []
+	var opt := OptionButton.new()
+	opt.add_theme_font_size_override("font_size", 12)
+	if creature:
+		for r in D.races:
+			species_ids.append(str(r.get("id", "human")))
+			opt.add_item(L.tc(r))
+	else:
+		for an in D.animals:
+			species_ids.append(str(an.get("id", "deer")))
+			opt.add_item(L.tc(an))
+	modal_content.add_child(_lbl("Вид", "Small", ThemeBuilder.MUTED, 11))
+	modal_content.add_child(opt)
+	var gender := OptionButton.new()
+	gender.add_theme_font_size_override("font_size", 12)
+	gender.add_item(L.t("male"))
+	gender.add_item(L.t("female"))
+	modal_content.add_child(_lbl(L.t("gender"), "Small", ThemeBuilder.MUTED, 11))
+	modal_content.add_child(gender)
+	var age_row := _hbox(6)
+	age_row.add_child(_lbl("Возраст", "Small", ThemeBuilder.MUTED, 11))
+	var age := HSlider.new()
+	age.min_value = 0
+	age.max_value = 80
+	age.step = 1
+	age.value = 22 if creature else 3
+	age.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var age_val := _lbl(str(int(age.value)), "", ThemeBuilder.TEXT, 12)
+	age.value_changed.connect(func(v): age_val.text = str(int(v)))
+	age_row.add_child(age)
+	age_row.add_child(age_val)
+	modal_content.add_child(age_row)
+	if creature:
+		var note := _lbl("Существо появится в точке под курсором или в центре выбранного поселения.", "Small", ThemeBuilder.MUTED, 11)
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD
+		modal_content.add_child(note)
+	var create := _button("Создать", "GoldButton")
+	create.pressed.connect(func():
+		var data := {
+			"species_id": str(species_ids[maxi(0, mini(opt.selected, species_ids.size() - 1))]),
+			"gender": gender.selected,
+			"age": age.value
+		}
+		spawn_requested.emit(kind, data)
+		close_modal()
+	)
+	modal_content.add_child(create)
+
+
+func stats_changed() -> void:	if panel_tab == "world":
 		var sig := "%d_%d_%d_%d" % [sim.year, sim.total_population, sim.settlements.size(), sim.animals.size()]
 		if sig != world_sig:
 			stats_refresh += 0.22
@@ -1117,6 +1272,7 @@ func update_hover(cell: Vector2i, w: WorldModel) -> void:
 	if cell.x < 0 or not w.in_bounds(cell.x, cell.y):
 		hover_label.text = L.t("zoom_hint")
 		return
+	last_hover_cell = cell
 	var b := w.biome_at(cell.x, cell.y)
 	var extra := ""
 	if w.res_type[w.idx(cell.x, cell.y)] > 0:

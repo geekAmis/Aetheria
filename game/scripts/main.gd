@@ -45,6 +45,7 @@ var size_choice := 256
 var diff_choice := "normal"
 var tribes_choice := 6
 var sandbox_choice := true
+var genesis_choice := false
 var codex_tab := "races"
 var new_seed_text := ""
 
@@ -65,7 +66,7 @@ func _ready() -> void:
 			shot_timer = shot_delay
 	elif auto_start:
 		await get_tree().process_frame
-		await _start_new({"seed": auto_seed, "size": auto_size, "preset": "continent", "difficulty": "normal", "tribes": 6, "sandbox": true})
+		await _start_new({"seed": auto_seed, "size": auto_size, "preset": "continent", "difficulty": "normal", "tribes": 6, "sandbox": true, "genesis": genesis_choice})
 		if shot_hour >= 0.0:
 			game.visual_hour = shot_hour
 			game.sky.apply(game.visual_hour, game.sim.season, game.sim.weather_mode, game.sim.nuclear_winter)
@@ -214,7 +215,12 @@ func _process(delta: float) -> void:
 		if bench_print <= 0.0:
 			bench_print = 2.0
 			if game != null:
-				print("[bench] fps=%d day=%d pop=%d agents=%d nodes=%d" % [int(Engine.get_frames_per_second()), int(game.sim.day), game.sim.total_population, game.sim.agents.size(), get_tree().get_node_count()])
+				var acts := {}
+				var emos := {}
+				for a in game.sim.agents:
+					acts[a.action] = int(acts.get(a.action, 0)) + 1
+					emos[a.emotion] = int(emos.get(a.emotion, 0)) + 1
+				print("[bench] fps=%d day=%d pop=%d agents=%d nodes=%d actions=%s emotions=%s" % [int(Engine.get_frames_per_second()), int(game.sim.day), game.sim.total_population, game.sim.agents.size(), get_tree().get_node_count(), str(acts), str(emos)])
 		if bench_seconds <= 0.0:
 			get_tree().quit()
 	if shot_timer > 0.0:
@@ -249,6 +255,8 @@ func _parse_args() -> void:
 					i += 1
 			"--autostart":
 				auto_start = true
+			"--genesis":
+				genesis_choice = true
 			"--seed":
 				if i + 1 < args.size():
 					auto_seed = int(args[i + 1])
@@ -712,6 +720,11 @@ func open_new_world() -> void:
 	sandbox.button_pressed = sandbox_choice
 	sandbox.toggled.connect(func(on): sandbox_choice = on)
 	menu_modal_content.add_child(sandbox)
+	var genesis := CheckButton.new()
+	genesis.text = "Genesis: первородные без готовых деревень"
+	genesis.button_pressed = genesis_choice
+	genesis.toggled.connect(func(on): genesis_choice = on)
+	menu_modal_content.add_child(genesis)
 	menu_modal_content.add_child(_hairline())
 	var desc := _lbl("Мир генерируется процедурно: тектоника, климат, реки, биомы и племена. Один и тот же seed даёт один и тот же мир.", "Small", ThemeBuilder.MUTED, 10)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -722,7 +735,7 @@ func open_new_world() -> void:
 		menu_modal.visible = false
 		menu_modal_open = false
 		var seed_v := int(new_seed_text) if new_seed_text.is_valid_int() else randi() % 999999
-		_start_new({"seed": seed_v, "size": size_choice, "preset": selected_preset, "difficulty": diff_choice, "tribes": tribes_choice, "sandbox": sandbox_choice})
+		_start_new({"seed": seed_v, "size": size_choice, "preset": selected_preset, "difficulty": diff_choice, "tribes": tribes_choice, "sandbox": sandbox_choice, "genesis": genesis_choice})
 	)
 	menu_modal_content.add_child(create)
 
