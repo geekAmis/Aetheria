@@ -34,6 +34,11 @@ var shot_modal := ""
 var shot_action := ""
 var bench_seconds := 0.0
 var bench_print := 0.0
+var profile_frames := 0
+var profile_times: Array = []
+var profile_cell := Vector2i.ZERO
+var profile_brush := true
+var profile_warmup := 0
 var menu_config: Dictionary = {}
 var selected_preset := "continent"
 var size_choice := 256
@@ -97,6 +102,10 @@ func _ready() -> void:
 			_open_game_modal()
 		if shot_action != "":
 			_do_action(shot_action)
+		if profile_frames > 0:
+			var sel = game.get_selected_settlement()
+			profile_cell = sel.center if sel != null else Vector2i(game.world.size / 2, game.world.size / 2)
+			print("[profile-start] frames=", profile_frames, " cell=", profile_cell)
 		if bench_seconds > 0.0:
 			game.set_speed(20.0)
 		if shot_path != "":
@@ -179,6 +188,24 @@ func _do_action(action: String) -> void:
 
 
 func _process(delta: float) -> void:
+	if profile_frames > 0 and game != null:
+		if profile_warmup > 0:
+			profile_warmup -= 1
+			return
+		profile_times.append(delta)
+		if profile_frames % 6 == 0 and profile_brush:
+			game.world.raise_area(profile_cell.x, profile_cell.y, 16, 0.01, "add")
+		profile_frames -= 1
+		if profile_frames == 0:
+			var sorted := profile_times.duplicate()
+			sorted.sort()
+			var n := sorted.size()
+			var p50: float = sorted[int(n * 0.50)]
+			var p95: float = sorted[int(n * 0.95)]
+			var mx: float = sorted[n - 1]
+			print("[profile] frames=%d p50=%.1fms p95=%.1fms max=%.1fms fps_avg=%.1f" % [n, p50 * 1000.0, p95 * 1000.0, mx * 1000.0, 1.0 / maxf(0.0001, _avg(profile_times))])
+			var ok := p95 <= 0.020 and mx <= 0.033
+			print("[profile] %s p95<=20ms max<=33ms" % ["PASS" if ok else "FAIL"])
 	if bench_seconds > 0.0:
 		if game != null and game.speed < 20.0:
 			game.set_speed(20.0)
@@ -274,6 +301,13 @@ func _parse_args() -> void:
 				if i + 1 < args.size():
 					bench_seconds = float(args[i + 1])
 					i += 1
+			"--profile":
+				profile_frames = 180
+				profile_warmup = 120
+			"--profile-idle":
+				profile_frames = 180
+				profile_warmup = 120
+				profile_brush = false
 		i += 1
 
 
@@ -495,6 +529,15 @@ func _spacer() -> Control:
 	c.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return c
+
+
+func _avg(arr: Array) -> float:
+	if arr.is_empty():
+		return 0.0
+	var s := 0.0
+	for v in arr:
+		s += float(v)
+	return s / float(arr.size())
 
 func _button(text: String, variation: String = "", min_size: Vector2 = Vector2.ZERO) -> Button:
 	var b := Button.new()

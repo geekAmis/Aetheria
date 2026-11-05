@@ -5,6 +5,7 @@ extends RefCounted
 
 signal terrain_changed(rect: Rect2i)
 signal biomes_changed(rect: Rect2i)
+signal water_changed(rect: Rect2i)
 
 const CELL := 2.0
 const HEIGHT_SCALE := 86.0
@@ -591,6 +592,7 @@ func raise_area(cx: int, cz: int, radius: float, strength: float, mode: String =
 	var x1 := mini(size - 1, cx + r)
 	var z1 := mini(size - 1, cz + r)
 	rect.size = Vector2i(x1 - rect.position.x + 1, z1 - rect.position.y + 1)
+	var water_dirty := false
 	for z in range(rect.position.y, z1 + 1):
 		for x in range(rect.position.x, x1 + 1):
 			var d := Vector2(x - cx, z - cz).length()
@@ -614,11 +616,14 @@ func raise_area(cx: int, cz: int, radius: float, strength: float, mode: String =
 							cnt += 1
 					avg /= float(cnt)
 					heights[i] = lerpf(heights[i], avg, clampf(strength * fall, 0.0, 1.0))
-			_update_water_after_height(i)
+			if _update_water_after_height(i):
+				water_dirty = true
 			_reclassify_cell(x, z)
 	_refresh_climate(rect)
 	terrain_changed.emit(rect)
 	biomes_changed.emit(rect)
+	if water_dirty:
+		water_changed.emit(rect)
 	return rect
 
 
@@ -699,6 +704,7 @@ func water_area(cx: int, cz: int, radius: float, kind: String) -> Rect2i:
 	_refresh_climate(rect)
 	terrain_changed.emit(rect)
 	biomes_changed.emit(rect)
+	water_changed.emit(rect)
 	return rect
 
 
@@ -719,7 +725,8 @@ func add_radiation(cx: int, cz: int, radius: int, amount: float) -> void:
 				radiation[i] = clampf(radiation[i] + amount * (1.0 - d / maxf(1.0, radius)), 0.0, 1.0)
 
 
-func _update_water_after_height(i: int) -> void:
+func _update_water_after_height(i: int) -> bool:
+	var before := water[i]
 	var h := heights[i]
 	if h < sea_level:
 		water[i] = maxf(water[i], sea_level - h)
@@ -728,6 +735,7 @@ func _update_water_after_height(i: int) -> void:
 	# небольшие лужи просто исчезают при подъёме
 	if water[i] > 0.0004 and h > sea_level + 0.012:
 		water[i] = minf(water[i], 0.006)
+	return absf(water[i] - before) > 0.00001
 
 
 func _refresh_climate(rect: Rect2i) -> void:
