@@ -2,7 +2,7 @@
 
 **Статус:** закрытый проект. Правообладатель: geekAmis.
 **Лицензия:** `LICENSE` (proprietary / all rights reserved).
-**Движок:** Godot 4.7.2 (MIT) — см. `THIRD_PARTY.md`.
+**Движок:** Godot 4.7.2 (MIT) — см. `game/THIRD_PARTY.md`.
 
 ## 1. Главное правило
 

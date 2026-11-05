@@ -8,7 +8,7 @@ Copyright (c) 2026 geekAmis. All rights reserved. / Все права защищ
 Настоящая лицензия распространяется на оригинальный код, данные, документацию,
 графику, звук, текст и иные материалы проекта Aetheria (далее — «Проект»),
 созданные автором Проекта, за исключением сторонних компонентов, перечисленных
-в файле THIRD_PARTY.md.
+в файле game/THIRD_PARTY.md.
 
 1. РАЗРЕШЁННОЕ ИСПОЛЬЗОВАНИЕ
    1.1. Вам разрешено запускать собранную игру для личного, некоммерческого
@@ -68,7 +68,8 @@ ENGLISH
 -------
 This license applies to the original code, data, documentation, art, audio,
 text and other materials of the Aetheria project (the "Project") created by
-the Project author, excluding third-party components listed in THIRD_PARTY.md.
+the Project author, excluding third-party components listed in
+game/THIRD_PARTY.md.
 
 1. PERMITTED USE
    1.1. You may run the compiled game for personal, non-commercial use.

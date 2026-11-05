@@ -17,6 +17,10 @@ credentials*
 secrets*
 *credentials*.json
 *secret*.json
+**/*token*
+**/*secret*
+**/*credential*
+**/*GITHUB_DATA*
 .netrc
 .git-credentials
 cookies.txt
@@ -45,6 +49,18 @@ id_ed25519*
 *.ovpn
 *.rdp
 *.mobileconfig
+
+# --- сторонние исполняемые файлы (кроме готовой сборки) --------------------
+*.exe
+!build/Aetheria.exe
+*.msi
+*.msix
+*.appx
+*.dmg
+*.pkg
+*.deb
+*.rpm
+*.appimage
 
 # --- пользовательские данные игры -------------------------------------------
 saves/

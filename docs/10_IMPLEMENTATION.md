@@ -19,6 +19,7 @@
 | Сохранение/загрузка (JSON + base64-массивы, автослот + 3 слота) | `scripts/core/save_system.gd`, `game.gd` | готово |
 | Аудио (процедурная эмбиент-музыка, синтез катастроф, CC0 UI-звуки) | `scripts/audio.gd` | готово |
 | Локализация RU/EN | `scripts/core/locale.gd`, поля `name_en`/`desc_en` | RU полно, EN частично |
+| Моды-надстройки (JSON-оверлей без изменения ядра) | `scripts/core/data_store.gd`, `MODDING.md` | готово |
 
 ## 2. Архитектура
 

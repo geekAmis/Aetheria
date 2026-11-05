@@ -7,6 +7,10 @@ AETHERIA — готовый билд
   Aetheria.exe --main-pack Aetheria.pck
 
 Aetheria.exe — runtime Godot 4.7.2, Aetheria.pck — ресурсы игры.
+Большой Aetheria.exe хранится через Git LFS: при клонировании выполните
+  git lfs install
+  git lfs pull
+Если LFS недоступен, используйте готовую папку build целиком.
 Папку можно переносить целиком. Сохранения лежат в
 %APPDATA%\Godot\app_userdata\Aetheria\saves
 (внутри игры: «Сохранить» / «Загрузить»).
