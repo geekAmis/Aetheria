@@ -62,6 +62,19 @@ var appearance: Dictionary = {}
 var bonds: Dictionary = {}   # agent id -> affinity -100..100
 var war_phase: String = ""
 var home_pos: Vector2 = Vector2.ZERO
+# --- Living Legends: характер, память, династия, религия ---
+var traits: Dictionary = {}
+var memory: Array = []
+var titles: Array = []
+var legend: float = 0.0
+var deeds: int = 0
+var dynasty: String = ""
+var generation: int = 1
+var parent_ids: Array = []
+var rival_id: int = -1
+var religion: String = ""
+var faith: float = 50.0
+var heir: bool = false
 
 
 func setup(p_id: int, p_race: Dictionary, p_gender: int, p_age: float, rng: RandomNumberGenerator) -> void:
@@ -117,7 +130,86 @@ func setup(p_id: int, p_race: Dictionary, p_gender: int, p_age: float, rng: Rand
 		"skin": rng.randf_range(-0.06, 0.08),
 		"hue": rng.randf()
 	}
+	traits = {
+		"ambition": rng.randi_range(15, 90),
+		"loyalty": rng.randi_range(20, 95),
+		"aggression": rng.randi_range(10, 90),
+		"piety": rng.randi_range(10, 95),
+		"sociability": rng.randi_range(15, 95),
+		"curiosity": rng.randi_range(10, 90),
+		"greed": rng.randi_range(10, 90)
+	}
+	match race_id:
+		"human":
+			traits["sociability"] += 10
+			traits["ambition"] += 5
+		"elf":
+			traits["piety"] += 18
+			traits["curiosity"] += 12
+			traits["aggression"] -= 10
+		"dwarf":
+			traits["ambition"] += 12
+			traits["loyalty"] += 12
+			traits["greed"] += 10
+		"orc":
+			traits["aggression"] += 22
+			traits["ambition"] += 8
+			traits["loyalty"] -= 8
+		"goblin":
+			traits["greed"] += 18
+			traits["curiosity"] += 10
+			traits["loyalty"] -= 5
+		"lizardfolk":
+			traits["curiosity"] += 8
+			traits["aggression"] += 8
+			traits["piety"] += 5
+		"dragonkin":
+			traits["ambition"] += 15
+			traits["aggression"] += 10
+	for k in traits:
+		traits[k] = clampi(int(traits[k]), 5, 100)
+	dynasty = family if not family.is_empty() else name
 	home_pos = pos
+
+
+func personality(id: String) -> float:
+	return float(traits.get(id, 45))
+
+
+func remember(kind: String, text: String, subject_id: int, pos: Vector2, importance: float, p_year: int) -> void:
+	memory.append({
+		"kind": kind, "text": text, "subject": subject_id,
+		"pos": [pos.x, pos.y], "importance": importance, "year": p_year
+	})
+	if memory.size() > 16:
+		memory.pop_front()
+	legend += importance * 0.8
+
+
+func add_title(title: String) -> bool:
+	if title in titles:
+		return false
+	titles.append(title)
+	legend += 12.0
+	deeds += 1
+	return true
+
+
+func add_deed(amount: float = 1.0) -> void:
+	deeds += 1
+	legend += amount
+
+
+func legend_score() -> float:
+	return legend + float(level) * 2.5 + float(kills) * 4.0 + float(deeds) * 5.0 + float(titles.size()) * 10.0 + (8.0 if notable else 0.0)
+
+
+func memory_value(kind: String) -> int:
+	var c := 0
+	for m in memory:
+		if str(m.get("kind", "")) == kind:
+			c += 1
+	return c
 
 
 func set_action(p_id: String, p_target: Vector2, reason: String = "", duration: float = 2.0) -> void:
@@ -253,7 +345,11 @@ func to_dict() -> Dictionary:
 		"emotion": emotion, "emotion_reason": emotion_reason, "emotion_timer": emotion_timer,
 		"carrying": carrying, "carry_amount": carry_amount, "hunting_id": hunting_id,
 		"immortal": immortal, "unkillable": unkillable, "favourite": favourite,
-		"appearance": appearance, "bonds": bonds, "home_pos": [home_pos.x, home_pos.y]
+		"appearance": appearance, "bonds": bonds, "home_pos": [home_pos.x, home_pos.y],
+		"traits": traits, "memory": memory, "titles": titles, "legend": legend,
+		"deeds": deeds, "dynasty": dynasty, "generation": generation,
+		"parent_ids": parent_ids, "rival_id": rival_id, "religion": religion,
+		"faith": faith, "heir": heir
 	}
 
 
@@ -324,4 +420,20 @@ static func from_dict(d: Dictionary) -> AgentData:
 		a.bonds[int(k)] = float(bd[k])
 	var hp: Array = d.get("home_pos", [a.pos.x, a.pos.y])
 	a.home_pos = Vector2(float(hp[0]), float(hp[1]))
+	a.traits = d.get("traits", {}).duplicate()
+	if a.traits.is_empty():
+		a.traits = {"ambition": 45, "loyalty": 50, "aggression": 40, "piety": 40, "sociability": 50, "curiosity": 45, "greed": 40}
+	a.memory = d.get("memory", []).duplicate(true)
+	a.titles = d.get("titles", []).duplicate()
+	a.legend = float(d.get("legend", 0))
+	a.deeds = int(d.get("deeds", 0))
+	a.dynasty = str(d.get("dynasty", a.family))
+	a.generation = int(d.get("generation", 1))
+	a.parent_ids = []
+	for pid in d.get("parent_ids", []):
+		a.parent_ids.append(int(pid))
+	a.rival_id = int(d.get("rival_id", -1))
+	a.religion = str(d.get("religion", ""))
+	a.faith = float(d.get("faith", 50))
+	a.heir = bool(d.get("heir", false))
 	return a
