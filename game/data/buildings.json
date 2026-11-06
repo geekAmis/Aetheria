@@ -1,24 +1,557 @@
 [
-  {"id":"campfire","name":"Костёр","name_en":"Campfire","era":0,"wood":0,"stone":0,"iron":0,"jobs":0,"size":0.6,"height":0.7,"color":"#6b4a2f","roof":"#e8792a","prod":{},"effect":{"warmth":1,"happiness":2},"special":"campfire","desc":"Первый огонь. Вокруг него собирается племя и начинается история."},
-  {"id":"hut","name":"Хижина","name_en":"Hut","era":0,"wood":8,"stone":0,"iron":0,"jobs":0,"size":1.1,"height":1.0,"color":"#8a6a45","roof":"#b5894d","prod":{},"effect":{"housing":4},"desc":"Стены из жердей и крыша из соломы. Дом для одной семьи."},
-  {"id":"farm","name":"Поле","name_en":"Farm","era":0,"wood":4,"stone":0,"iron":0,"jobs":2,"size":2.0,"height":0.15,"color":"#b7a04a","roof":"#8a7a2f","prod":{"food":9},"effect":{"food":9},"special":"farm","desc":"Вспаханная земля. Каждый колос — ещё один день жизни племени."},
-  {"id":"lumber","name":"Лесопилка","name_en":"Lumber Camp","era":0,"wood":6,"stone":0,"iron":0,"jobs":2,"size":1.2,"height":0.8,"color":"#7a5a3a","roof":"#5c432a","prod":{"wood":7},"effect":{},"desc":"Топоры, пилы и штабеля брёвен на краю леса."},
-  {"id":"pasture","name":"Загон","name_en":"Pasture","era":0,"wood":5,"stone":0,"iron":0,"jobs":1,"size":1.6,"height":0.3,"color":"#8a9a4a","roof":"#6e7a38","prod":{"food":4},"effect":{"food":4},"special":"pasture","desc":"Огороженный луг со скотом. Мясо, молоко и шерсть."},
-  {"id":"well","name":"Колодец","name_en":"Well","era":0,"wood":3,"stone":6,"iron":0,"jobs":0,"size":0.6,"height":0.8,"color":"#8a8a8a","roof":"#6a6a6a","prod":{},"effect":{"health":2,"water":1},"special":"well","desc":"Чистая вода в двух шагах. Дети перестают болеть."},
-  {"id":"granary","name":"Амбар","name_en":"Granary","era":1,"wood":14,"stone":4,"iron":0,"jobs":1,"size":1.4,"height":1.3,"color":"#a8834e","roof":"#7a5a32","prod":{},"effect":{"food_store":200,"happiness":1},"desc":"Запас на зиму. Голод начинается не с неба, а с пустого амбара."},
-  {"id":"quarry","name":"Каменоломня","name_en":"Quarry","era":1,"wood":8,"stone":0,"iron":0,"jobs":2,"size":1.3,"height":0.6,"color":"#9a9a8a","roof":"#777766","prod":{"stone":7},"effect":{},"desc":"Яма, из которой достают сердце горы."},
-  {"id":"workshop","name":"Мастерская","name_en":"Workshop","era":1,"wood":12,"stone":6,"iron":0,"jobs":2,"size":1.4,"height":1.1,"color":"#8a6a4a","roof":"#6a4a2a","prod":{"goods":4},"effect":{"tools":1},"desc":"Здесь рождаются инструменты, ткани и первые механизмы."},
-  {"id":"market","name":"Рынок","name_en":"Market","era":2,"wood":16,"stone":8,"iron":2,"jobs":2,"size":1.8,"height":0.9,"color":"#c9a05a","roof":"#a06a32","prod":{"gold":3},"effect":{"happiness":3,"trade":1},"special":"market","desc":"Площадь, где встречаются чужие и договариваются о своём."},
-  {"id":"mine","name":"Шахта","name_en":"Mine","era":2,"wood":10,"stone":10,"iron":0,"jobs":3,"size":1.0,"height":0.7,"color":"#5a5a5a","roof":"#3a3a3a","prod":{"iron":3,"stone":2},"effect":{},"special":"mine","desc":"Нора вглубь, где находят железо, уголь и иногда кости."},
-  {"id":"temple","name":"Храм","name_en":"Temple","era":1,"wood":10,"stone":16,"iron":0,"jobs":1,"size":1.5,"height":2.0,"color":"#d8d0b8","roof":"#c9a23a","prod":{"faith":3},"effect":{"faith":3,"happiness":4,"sanity":1},"special":"temple","desc":"Дом для богов. Чем выше шпиль, тем громче молитвы."},
-  {"id":"barracks","name":"Казармы","name_en":"Barracks","era":2,"wood":18,"stone":12,"iron":4,"jobs":1,"size":1.8,"height":1.2,"color":"#8a7a6a","roof":"#5a4a3a","prod":{},"effect":{"army":8,"order":1},"special":"barracks","desc":"Здесь спят те, кто просыпается первыми."},
-  {"id":"walls","name":"Стены","name_en":"Walls","era":2,"wood":8,"stone":24,"iron":0,"jobs":0,"size":3.0,"height":1.6,"color":"#a0a0a0","roof":"#808080","prod":{},"effect":{"defense":20},"special":"wall","desc":"Камень, между которым и миром стоит выбор."},
-  {"id":"library","name":"Библиотека","name_en":"Library","era":3,"wood":18,"stone":18,"iron":2,"jobs":2,"size":1.8,"height":1.8,"color":"#bfa77a","roof":"#8a5a3a","prod":{"science":2},"effect":{"science":2},"special":"library","desc":"Свитки, книги и те, кто задаёт неудобные вопросы."},
-  {"id":"university","name":"Университет","name_en":"University","era":4,"wood":24,"stone":30,"iron":6,"jobs":4,"size":2.4,"height":2.2,"color":"#d8c8a8","roof":"#7a4a2a","prod":{"science":5},"effect":{"science":5},"special":"library","desc":"Город внутри города, где учат смотреть дальше."},
-  {"id":"monument","name":"Монумент","name_en":"Monument","era":3,"wood":10,"stone":40,"iron":4,"jobs":0,"size":1.6,"height":3.2,"color":"#c8c0a8","roof":"#b89a3a","prod":{"faith":1},"effect":{"happiness":6,"legacy":1},"special":"monument","desc":"Камень, который переживёт и имя, и автора."},
-  {"id":"factory","name":"Фабрика","name_en":"Factory","era":5,"wood":20,"stone":30,"iron":20,"jobs":5,"size":2.6,"height":1.8,"color":"#6a6a6a","roof":"#4a4a4a","prod":{"goods":8,"gold":2},"effect":{"production":8,"pollution":2},"special":"factory","desc":"Дым, грохот и вещи, которых раньше не было."},
-  {"id":"power","name":"Электростанция","name_en":"Power Plant","era":6,"wood":20,"stone":40,"iron":30,"jobs":3,"size":2.8,"height":2.0,"color":"#7a7a8a","roof":"#4a4a5a","prod":{"goods":4},"effect":{"production":6},"special":"factory","desc":"Провода тянутся к городам, как корни."},
-  {"id":"lab","name":"Лаборатория","name_en":"Research Lab","era":6,"wood":20,"stone":30,"iron":20,"jobs":4,"size":1.8,"height":1.6,"color":"#c8d8e0","roof":"#5a7a8a","prod":{"science":8},"effect":{"science":8},"special":"library","desc":"Белые халаты и вопросы, на которые страшно отвечать."},
-  {"id":"silo","name":"Ракетная шахта","name_en":"Missile Silo","era":7,"wood":20,"stone":50,"iron":40,"jobs":2,"size":2.0,"height":1.2,"color":"#5a5a5a","roof":"#c84a2a","prod":{},"effect":{"nuke":1},"special":"silo","desc":"Тихая дверь в земле. За ней — конец истории или её новая глава."},
-  {"id":"spaceport","name":"Космодром","name_en":"Spaceport","era":7,"wood":30,"stone":50,"iron":60,"jobs":5,"size":3.0,"height":1.6,"color":"#c0c0c0","roof":"#e8e8e8","prod":{"science":4},"effect":{"science":4,"legacy":2},"special":"monument","desc":"Стальная стрела, направленная в небо. Человечество снова делает шаг."}
+  {
+    "id": "campfire",
+    "name": "Костёр",
+    "name_en": "Campfire",
+    "era": 0,
+    "wood": 0,
+    "stone": 0,
+    "iron": 0,
+    "jobs": 0,
+    "size": 0.6,
+    "height": 0.7,
+    "color": "#6b4a2f",
+    "roof": "#e8792a",
+    "prod": {},
+    "effect": {
+      "warmth": 1,
+      "happiness": 2
+    },
+    "special": "campfire",
+    "desc": "Первый огонь. Вокруг него собирается племя и начинается история."
+  },
+  {
+    "id": "hut",
+    "name": "Хижина",
+    "name_en": "Hut",
+    "era": 0,
+    "wood": 8,
+    "stone": 0,
+    "iron": 0,
+    "jobs": 0,
+    "size": 1.1,
+    "height": 1.0,
+    "color": "#8a6a45",
+    "roof": "#b5894d",
+    "prod": {},
+    "effect": {
+      "housing": 4
+    },
+    "desc": "Стены из жердей и крыша из соломы. Дом для одной семьи."
+  },
+  {
+    "id": "farm",
+    "name": "Поле",
+    "name_en": "Farm",
+    "era": 0,
+    "wood": 4,
+    "stone": 0,
+    "iron": 0,
+    "jobs": 2,
+    "size": 2.0,
+    "height": 0.15,
+    "color": "#b7a04a",
+    "roof": "#8a7a2f",
+    "prod": {
+      "food": 9
+    },
+    "effect": {
+      "food": 9
+    },
+    "special": "farm",
+    "desc": "Вспаханная земля. Каждый колос — ещё один день жизни племени."
+  },
+  {
+    "id": "lumber",
+    "name": "Лесопилка",
+    "name_en": "Lumber Camp",
+    "era": 0,
+    "wood": 6,
+    "stone": 0,
+    "iron": 0,
+    "jobs": 2,
+    "size": 1.2,
+    "height": 0.8,
+    "color": "#7a5a3a",
+    "roof": "#5c432a",
+    "prod": {
+      "wood": 7
+    },
+    "effect": {},
+    "desc": "Топоры, пилы и штабеля брёвен на краю леса."
+  },
+  {
+    "id": "pasture",
+    "name": "Загон",
+    "name_en": "Pasture",
+    "era": 0,
+    "wood": 5,
+    "stone": 0,
+    "iron": 0,
+    "jobs": 1,
+    "size": 1.6,
+    "height": 0.3,
+    "color": "#8a9a4a",
+    "roof": "#6e7a38",
+    "prod": {
+      "food": 4
+    },
+    "effect": {
+      "food": 4
+    },
+    "special": "pasture",
+    "desc": "Огороженный луг со скотом. Мясо, молоко и шерсть."
+  },
+  {
+    "id": "well",
+    "name": "Колодец",
+    "name_en": "Well",
+    "era": 0,
+    "wood": 3,
+    "stone": 6,
+    "iron": 0,
+    "jobs": 0,
+    "size": 0.6,
+    "height": 0.8,
+    "color": "#8a8a8a",
+    "roof": "#6a6a6a",
+    "prod": {},
+    "effect": {
+      "health": 2,
+      "water": 1
+    },
+    "special": "well",
+    "desc": "Чистая вода в двух шагах. Дети перестают болеть."
+  },
+  {
+    "id": "granary",
+    "name": "Амбар",
+    "name_en": "Granary",
+    "era": 1,
+    "wood": 14,
+    "stone": 4,
+    "iron": 0,
+    "jobs": 1,
+    "size": 1.4,
+    "height": 1.3,
+    "color": "#a8834e",
+    "roof": "#7a5a32",
+    "prod": {},
+    "effect": {
+      "food_store": 200,
+      "happiness": 1
+    },
+    "desc": "Запас на зиму. Голод начинается не с неба, а с пустого амбара."
+  },
+  {
+    "id": "quarry",
+    "name": "Каменоломня",
+    "name_en": "Quarry",
+    "era": 1,
+    "wood": 8,
+    "stone": 0,
+    "iron": 0,
+    "jobs": 2,
+    "size": 1.3,
+    "height": 0.6,
+    "color": "#9a9a8a",
+    "roof": "#777766",
+    "prod": {
+      "stone": 7
+    },
+    "effect": {},
+    "desc": "Яма, из которой достают сердце горы."
+  },
+  {
+    "id": "workshop",
+    "name": "Мастерская",
+    "name_en": "Workshop",
+    "era": 1,
+    "wood": 12,
+    "stone": 6,
+    "iron": 0,
+    "jobs": 2,
+    "size": 1.4,
+    "height": 1.1,
+    "color": "#8a6a4a",
+    "roof": "#6a4a2a",
+    "prod": {
+      "goods": 4
+    },
+    "effect": {
+      "tools": 1
+    },
+    "desc": "Здесь рождаются инструменты, ткани и первые механизмы."
+  },
+  {
+    "id": "market",
+    "name": "Рынок",
+    "name_en": "Market",
+    "era": 2,
+    "wood": 16,
+    "stone": 8,
+    "iron": 2,
+    "jobs": 2,
+    "size": 1.8,
+    "height": 0.9,
+    "color": "#c9a05a",
+    "roof": "#a06a32",
+    "prod": {
+      "gold": 3,
+      "goods": 2
+    },
+    "effect": {
+      "happiness": 3,
+      "trade": 1
+    },
+    "special": "market",
+    "desc": "Площадь, где встречаются чужие и договариваются о своём."
+  },
+  {
+    "id": "mine",
+    "name": "Шахта",
+    "name_en": "Mine",
+    "era": 2,
+    "wood": 10,
+    "stone": 10,
+    "iron": 0,
+    "jobs": 3,
+    "size": 1.0,
+    "height": 0.7,
+    "color": "#5a5a5a",
+    "roof": "#3a3a3a",
+    "prod": {
+      "iron": 3,
+      "stone": 2
+    },
+    "effect": {},
+    "special": "mine",
+    "desc": "Нора вглубь, где находят железо, уголь и иногда кости."
+  },
+  {
+    "id": "temple",
+    "name": "Храм",
+    "name_en": "Temple",
+    "era": 1,
+    "wood": 10,
+    "stone": 16,
+    "iron": 0,
+    "jobs": 1,
+    "size": 1.5,
+    "height": 2.0,
+    "color": "#d8d0b8",
+    "roof": "#c9a23a",
+    "prod": {
+      "faith": 3
+    },
+    "effect": {
+      "faith": 3,
+      "happiness": 4,
+      "sanity": 1
+    },
+    "special": "temple",
+    "desc": "Дом для богов. Чем выше шпиль, тем громче молитвы."
+  },
+  {
+    "id": "barracks",
+    "name": "Казармы",
+    "name_en": "Barracks",
+    "era": 2,
+    "wood": 18,
+    "stone": 12,
+    "iron": 4,
+    "jobs": 1,
+    "size": 1.8,
+    "height": 1.2,
+    "color": "#8a7a6a",
+    "roof": "#5a4a3a",
+    "prod": {},
+    "effect": {
+      "army": 8,
+      "order": 1
+    },
+    "special": "barracks",
+    "desc": "Здесь спят те, кто просыпается первыми."
+  },
+  {
+    "id": "walls",
+    "name": "Стены",
+    "name_en": "Walls",
+    "era": 2,
+    "wood": 8,
+    "stone": 24,
+    "iron": 0,
+    "jobs": 0,
+    "size": 3.0,
+    "height": 1.6,
+    "color": "#a0a0a0",
+    "roof": "#808080",
+    "prod": {},
+    "effect": {
+      "defense": 20
+    },
+    "special": "wall",
+    "desc": "Камень, между которым и миром стоит выбор."
+  },
+  {
+    "id": "library",
+    "name": "Библиотека",
+    "name_en": "Library",
+    "era": 3,
+    "wood": 18,
+    "stone": 18,
+    "iron": 2,
+    "jobs": 2,
+    "size": 1.8,
+    "height": 1.8,
+    "color": "#bfa77a",
+    "roof": "#8a5a3a",
+    "prod": {
+      "science": 2
+    },
+    "effect": {
+      "science": 2
+    },
+    "special": "library",
+    "desc": "Свитки, книги и те, кто задаёт неудобные вопросы."
+  },
+  {
+    "id": "university",
+    "name": "Университет",
+    "name_en": "University",
+    "era": 4,
+    "wood": 24,
+    "stone": 30,
+    "iron": 6,
+    "jobs": 4,
+    "size": 2.4,
+    "height": 2.2,
+    "color": "#d8c8a8",
+    "roof": "#7a4a2a",
+    "prod": {
+      "science": 5
+    },
+    "effect": {
+      "science": 5
+    },
+    "special": "library",
+    "desc": "Город внутри города, где учат смотреть дальше."
+  },
+  {
+    "id": "monument",
+    "name": "Монумент",
+    "name_en": "Monument",
+    "era": 3,
+    "wood": 10,
+    "stone": 40,
+    "iron": 4,
+    "jobs": 0,
+    "size": 1.6,
+    "height": 3.2,
+    "color": "#c8c0a8",
+    "roof": "#b89a3a",
+    "prod": {
+      "faith": 1
+    },
+    "effect": {
+      "happiness": 6,
+      "legacy": 1
+    },
+    "special": "monument",
+    "desc": "Камень, который переживёт и имя, и автора."
+  },
+  {
+    "id": "factory",
+    "name": "Фабрика",
+    "name_en": "Factory",
+    "era": 5,
+    "wood": 20,
+    "stone": 30,
+    "iron": 20,
+    "jobs": 5,
+    "size": 2.6,
+    "height": 1.8,
+    "color": "#6a6a6a",
+    "roof": "#4a4a4a",
+    "prod": {
+      "goods": 8,
+      "gold": 2
+    },
+    "effect": {
+      "production": 8,
+      "pollution": 2
+    },
+    "special": "factory",
+    "desc": "Дым, грохот и вещи, которых раньше не было."
+  },
+  {
+    "id": "power",
+    "name": "Электростанция",
+    "name_en": "Power Plant",
+    "era": 6,
+    "wood": 20,
+    "stone": 40,
+    "iron": 30,
+    "jobs": 3,
+    "size": 2.8,
+    "height": 2.0,
+    "color": "#7a7a8a",
+    "roof": "#4a4a5a",
+    "prod": {
+      "goods": 4
+    },
+    "effect": {
+      "production": 6
+    },
+    "special": "factory",
+    "desc": "Провода тянутся к городам, как корни."
+  },
+  {
+    "id": "lab",
+    "name": "Лаборатория",
+    "name_en": "Research Lab",
+    "era": 6,
+    "wood": 20,
+    "stone": 30,
+    "iron": 20,
+    "jobs": 4,
+    "size": 1.8,
+    "height": 1.6,
+    "color": "#c8d8e0",
+    "roof": "#5a7a8a",
+    "prod": {
+      "science": 8
+    },
+    "effect": {
+      "science": 8
+    },
+    "special": "library",
+    "desc": "Белые халаты и вопросы, на которые страшно отвечать."
+  },
+  {
+    "id": "silo",
+    "name": "Ракетная шахта",
+    "name_en": "Missile Silo",
+    "era": 7,
+    "wood": 20,
+    "stone": 50,
+    "iron": 40,
+    "jobs": 2,
+    "size": 2.0,
+    "height": 1.2,
+    "color": "#5a5a5a",
+    "roof": "#c84a2a",
+    "prod": {},
+    "effect": {
+      "nuke": 1
+    },
+    "special": "silo",
+    "desc": "Тихая дверь в земле. За ней — конец истории или её новая глава."
+  },
+  {
+    "id": "spaceport",
+    "name": "Космодром",
+    "name_en": "Spaceport",
+    "era": 7,
+    "wood": 30,
+    "stone": 50,
+    "iron": 60,
+    "jobs": 5,
+    "size": 3.0,
+    "height": 1.6,
+    "color": "#c0c0c0",
+    "roof": "#e8e8e8",
+    "prod": {
+      "science": 4
+    },
+    "effect": {
+      "science": 4,
+      "legacy": 2
+    },
+    "special": "monument",
+    "desc": "Стальная стрела, направленная в небо. Человечество снова делает шаг."
+  },
+  {
+    "id": "tenement",
+    "name": "Многоэтажный дом",
+    "name_en": "Tenement",
+    "era": 3,
+    "wood": 30,
+    "stone": 20,
+    "iron": 0,
+    "jobs": 0,
+    "size": 1.6,
+    "height": 2.4,
+    "color": "#b8a890",
+    "roof": "#7a5a3a",
+    "prod": {},
+    "effect": {
+      "happiness": 2
+    },
+    "special": "tenement",
+    "desc": "Высотный дом для растущего города."
+  },
+  {
+    "id": "tower",
+    "name": "Сторожевая башня",
+    "name_en": "Watchtower",
+    "era": 2,
+    "wood": 4,
+    "stone": 24,
+    "iron": 0,
+    "jobs": 0,
+    "size": 1.1,
+    "height": 2.2,
+    "color": "#a0a0a0",
+    "roof": "#808080",
+    "prod": {},
+    "effect": {
+      "defense": 12
+    },
+    "special": "tower",
+    "desc": "Башня с бойницами для обороны."
+  },
+  {
+    "id": "bastion",
+    "name": "Крепостной бастион",
+    "name_en": "Bastion",
+    "era": 3,
+    "wood": 6,
+    "stone": 36,
+    "iron": 6,
+    "jobs": 0,
+    "size": 1.5,
+    "height": 2.6,
+    "color": "#909090",
+    "roof": "#707070",
+    "prod": {},
+    "effect": {
+      "defense": 22
+    },
+    "special": "tower",
+    "desc": "Мощный бастион с бойницами и зубцами."
+  },
+  {
+    "id": "harbor",
+    "name": "Гавань",
+    "name_en": "Harbor",
+    "era": 2,
+    "wood": 24,
+    "stone": 10,
+    "iron": 0,
+    "jobs": 2,
+    "size": 1.8,
+    "height": 1.4,
+    "color": "#8a6a4a",
+    "roof": "#6a4a2a",
+    "prod": {
+      "food": 5,
+      "gold": 2
+    },
+    "effect": {
+      "trade": 2
+    },
+    "special": "harbor",
+    "desc": "Причал для рыболовных и торговых судов."
+  }
 ]

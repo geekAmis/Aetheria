@@ -39,12 +39,16 @@ var hover_cell := Vector2i(-1, -1)
 var hover_timer := 0.0
 var hud_timer := 0.0
 var last_hud_us := 0
+var nav_grid: Dictionary = {}
+const NAV_CELL := 4.0
 var sky_timer := 0.0
 var autosave_timer := 180.0
 var save_dirty := true
 
 var selected_agent_id := -1
 var selected_settlement_id := -1
+var drag_agent_id := -1
+var drag_moved := false
 var follow_agent := -1
 
 var undo_stack: Array = []
@@ -197,6 +201,9 @@ func _after_sim() -> void:
 	for s in sim.settlements:
 		nature_view.mark_dirty_rect(_nature_rect(s.center))
 	sim.settlement_founded.connect(func(s): nature_view.mark_dirty_rect(_nature_rect(s.center)))
+	_rebuild_nav()
+	sim.settlement_founded.connect(func(_s): _rebuild_nav())
+	sim.settlement_structure_changed.connect(func(_id): _rebuild_nav())
 	fx.screen_flash.connect(_on_screen_flash)
 	fx.screen_shake.connect(func(a, d): camera_rig.add_shake(a, d))
 	sim.chronicle_added.connect(_on_chronicle_event)
@@ -229,6 +236,8 @@ func _create_hud() -> void:
 	hud.spawn_requested.connect(_on_spawn_requested)
 	hud.inspect_agent_requested.connect(_on_inspect_agent_requested)
 	hud.spawn_monster_requested.connect(_on_spawn_monster_requested)
+	hud.perk_toggled.connect(_on_perk_toggled)
+	hud.immortal_toggled.connect(_on_immortal_toggled)
 	hud.server_settings_changed.connect(_on_settings_changed)
 	hud.set_speed(speed)
 	hud.update_essence(essence, sandbox)
@@ -327,6 +336,32 @@ func _on_spawn_monster_requested(kind: String) -> void:
 	refresh_inspector_force()
 
 
+func _on_perk_toggled(id: int, perk: String, enabled: bool) -> void:
+	var a: AgentData = sim.agent_by_id.get(id, null)
+	if a == null:
+		return
+	if enabled:
+		if not a.perks.has(perk):
+			a.perks.append(perk)
+	else:
+		a.perks.erase(perk)
+	a.max_health = a.compute_max_health()
+	a.health = minf(a.health, a.max_health)
+	a.set_emotion("happy", "perk", 8.0)
+	refresh_inspector_force()
+
+
+func _on_immortal_toggled(id: int, enabled: bool) -> void:
+	var a: AgentData = sim.agent_by_id.get(id, null)
+	if a == null:
+		return
+	a.immortal = enabled
+	if enabled:
+		a.set_emotion("proud", "immortal", 60.0)
+	hud.toast("%s: бессмертие %s" % [a.display_name(), "включено" if enabled else "выключено"], "power")
+	refresh_inspector_force()
+
+
 func _on_inspect_agent_requested(id: int) -> void:
 	var a: AgentData = sim.agent_by_id.get(id, null)
 	if a == null or not a.alive:
@@ -413,6 +448,10 @@ func _process(delta: float) -> void:
 	if creature_view != null:
 		creature_view.skip_sync = false
 		creature_view.set_focus(world.world_to_cell(camera_rig.target))
+		var lod := 0 if camera_rig.distance < 120.0 else (1 if camera_rig.distance < 220.0 else 2)
+		creature_view.set_lod(lod)
+		if nature_view != null:
+			nature_view.set_lod(lod)
 	play_seconds += delta
 	if hud != null and hud.is_modal_open():
 		pass
@@ -430,6 +469,7 @@ func _process(delta: float) -> void:
 		_move_agents(delta)
 		_move_animals(delta)
 		_move_monsters(delta)
+		_move_ships(delta)
 		autosave_timer -= delta
 		if autosave_timer <= 0.0:
 			autosave_timer = 180.0
@@ -437,12 +477,26 @@ func _process(delta: float) -> void:
 				save_to_slot(0, true)
 				save_dirty = false
 	# если день был тяжёлым, пропускаем тяжёлые пересборки в этом кадре
+	var heavy_frame := sim.heavy_step_fresh
 	if sim.heavy_step_fresh:
 		if terrain_view != null:
 			terrain_view.skip_budget = true
 		if creature_view != null:
 			creature_view.skip_sync = true
 		sim.heavy_step_fresh = false
+	# перетаскивание существа
+	if drag_agent_id >= 0:
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not _over_ui():
+			var dcell := camera_rig.pick_cell()
+			var da: AgentData = sim.agent_by_id.get(drag_agent_id, null)
+			if dcell.x >= 0 and da != null and da.alive:
+				da.pos = Vector2(dcell)
+				da.target = da.pos
+				da.home_pos = da.pos
+				da.set_action("idle", da.pos, "dragged", 1.0)
+				drag_moved = true
+		else:
+			drag_agent_id = -1
 	# кисть
 	if stroke_active and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not _over_ui():
 		stroke_last += delta
@@ -461,8 +515,11 @@ func _process(delta: float) -> void:
 			follow_agent = -1
 	hud_timer -= delta
 	if hud_timer <= 0.0:
-		hud_timer = 0.22
-		_update_hud()
+		if heavy_frame or (terrain_view != null and terrain_view.last_frame_us > 2500):
+			hud_timer = 0.06
+		else:
+			hud_timer = 0.22
+			_update_hud()
 	sky_timer -= delta
 	if sky_timer <= 0.0:
 		sky_timer = 0.18
@@ -526,6 +583,50 @@ func _update_brush_cursor() -> void:
 	fx.update_brush(cell, brush_radius, col, true)
 
 
+func _rebuild_nav() -> void:
+	nav_grid.clear()
+	if sim == null:
+		return
+	for s in sim.settlements:
+		if s.destroyed:
+			continue
+		for b in s.buildings:
+			var bd: Dictionary = D.building(str(b.type))
+			var r := maxf(0.7, float(bd.get("size", 1.2)) * 0.52)
+			if str(bd.get("special", "")) == "wall":
+				r = 2.2
+			var key := Vector2i(floor(float(b.x) / NAV_CELL), floor(float(b.z) / NAV_CELL))
+			if not nav_grid.has(key):
+				nav_grid[key] = []
+			nav_grid[key].append([Vector2(float(b.x), float(b.z)), r])
+
+
+func _blocked_at(p: Vector2, radius: float = 0.42) -> bool:
+	var kx := int(floor(p.x / NAV_CELL))
+	var kz := int(floor(p.y / NAV_CELL))
+	for dz in range(-1, 2):
+		for dx in range(-1, 2):
+			var arr: Array = nav_grid.get(Vector2i(kx + dx, kz + dz), [])
+			for blk in arr:
+				var bp: Vector2 = blk[0]
+				var br: float = float(blk[1]) + radius
+				if p.distance_squared_to(bp) < br * br:
+					return true
+	return false
+
+
+func _slide_move(from: Vector2, to: Vector2, radius: float = 0.42) -> Vector2:
+	if not _blocked_at(to, radius):
+		return to
+	var only_x := Vector2(to.x, from.y)
+	if not _blocked_at(only_x, radius):
+		return only_x
+	var only_z := Vector2(from.x, to.y)
+	if not _blocked_at(only_z, radius):
+		return only_z
+	return from
+
+
 func _move_agents(delta: float) -> void:
 	if sim == null:
 		return
@@ -540,6 +641,8 @@ func _move_agents(delta: float) -> void:
 	for av in sim.agents:
 		var a: AgentData = av
 		if not a.alive:
+			continue
+		if a.id == drag_agent_id:
 			continue
 		if creature_view != null and creature_view.focus_cell.x >= 0.0 and a.pos.distance_to(creature_view.focus_cell) > 160.0:
 			if (Engine.get_process_frames() + a.id) % 3 != 0:
@@ -590,6 +693,7 @@ func _move_agents(delta: float) -> void:
 		if world.is_water_cell(cc.x, cc.y):
 			step *= 0.45
 			next = a.pos + (to / d) * minf(step, d)
+		next = _slide_move(a.pos, next, 0.45)
 		a.pos = Vector2(clampf(next.x, 0.5, world.size - 1.5), clampf(next.y, 0.5, world.size - 1.5))
 
 
@@ -608,6 +712,27 @@ func _move_monsters(delta: float) -> void:
 		m.pos = p + (to / d) * minf(step, d)
 
 
+func _move_ships(delta: float) -> void:
+	var mult := 1.0 + speed * 0.08
+	for sh in sim.ships:
+		var p: Vector2 = sh.pos
+		var t: Vector2 = sh.target
+		var to := t - p
+		var d := to.length()
+		if d < 0.8:
+			continue
+		var step := (1.6 if str(sh.kind) == "warship" else 1.1) * mult * delta
+		var nxt := p + (to / d) * minf(step, d)
+		var cc := world.cell_of(nxt)
+		if not world.is_water_cell(cc.x, cc.y):
+			# мелководье/берег: ищем воду рядом
+			var w := sim._water_near(Vector2i(cc), 4)
+			if w.x >= 0:
+				sh.target = Vector2(w)
+			continue
+		sh.pos = nxt
+
+
 func _move_animals(delta: float) -> void:
 	var mult := 1.0 + speed * 0.10
 	for an in sim.animals:
@@ -623,7 +748,7 @@ func _move_animals(delta: float) -> void:
 		var cc := world.cell_of(nxt)
 		if world.is_water_cell(cc.x, cc.y) != world.is_water_cell(int(p.x), int(p.y)):
 			continue
-		an.pos = nxt
+		an.pos = _slide_move(p, nxt, 0.28)
 
 
 func _over_ui() -> bool:
@@ -690,7 +815,18 @@ func _unhandled_input(event: InputEvent) -> void:
 			if cell.x < 0:
 				return
 			if active_tool == "inspect":
-				_select_at(cell)
+				var drag_a := _agent_at(cell)
+				if drag_a != null:
+					selected_agent_id = drag_a.id
+					selected_settlement_id = -1
+					sim.selected_settlement_id = -1
+					creature_view.set_selected(drag_a.id)
+					settlement_view.select(-1)
+					hud.inspect_agent(drag_a)
+					drag_agent_id = drag_a.id
+					drag_moved = false
+				else:
+					_select_at(cell)
 			elif active_tool == "tribe_spawn":
 				pass
 			else:
@@ -745,6 +881,20 @@ func _on_settings_changed() -> void:
 
 
 # ------------------------------------------------------------------ selection
+
+func _agent_at(cell: Vector2i) -> AgentData:
+	var best: AgentData = null
+	var bestd := 2.6
+	for av in sim.agents:
+		var a: AgentData = av
+		if not a.alive:
+			continue
+		var d: float = a.pos.distance_to(Vector2(cell))
+		if d < bestd:
+			bestd = d
+			best = a
+	return best
+
 
 func _select_at(cell: Vector2i) -> void:
 	var best: AgentData = null

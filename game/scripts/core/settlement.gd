@@ -59,6 +59,8 @@ var tribute_rate: float = 0.12
 var dynasty: String = ""
 var founded_by: int = -1
 var specialization: String = "balanced"
+var last_stage: String = ""
+var ruin_loot: Dictionary = {}
 
 const STAGE_POPS := {"camp": 0, "village": 15, "town": 55, "city": 150, "metropolis": 350}
 const STAGE_RADIUS := {"camp": 7.0, "village": 11.0, "town": 17.0, "city": 25.0, "metropolis": 34.0}
@@ -111,6 +113,8 @@ func housing() -> int:
 	for b in buildings:
 		if b.type == "hut":
 			h += 8
+		elif b.type == "tenement":
+			h += 18
 		elif b.type == "granary":
 			h += 2
 	return h
@@ -261,7 +265,8 @@ func to_dict() -> Dictionary:
 		"known": known, "roads": roads,
 		"religion": religion, "zeal": zeal, "holy_war": holy_war,
 		"overlord_id": overlord_id, "vassals": vassals, "tribute_rate": tribute_rate,
-		"dynasty": dynasty, "founded_by": founded_by, "specialization": specialization
+		"dynasty": dynasty, "founded_by": founded_by, "specialization": specialization,
+		"last_stage": last_stage, "ruin_loot": ruin_loot
 	}
 
 
@@ -338,5 +343,7 @@ static func from_dict(d: Dictionary) -> SettlementData:
 	s.dynasty = str(d.get("dynasty", ""))
 	s.founded_by = int(d.get("founded_by", -1))
 	s.specialization = str(d.get("specialization", "balanced"))
+	s.last_stage = str(d.get("last_stage", s.stage))
+	s.ruin_loot = d.get("ruin_loot", {}).duplicate()
 	s.color = D.race(s.race_id).get("color_c", Color.WHITE)
 	return s

@@ -189,6 +189,9 @@ func _do_action(action: String) -> void:
 					break
 		"inspect_settlement":
 			game.select_settlement(s.id)
+		"closeup":
+			game.select_settlement(s.id)
+			game.camera_rig.focus_cell(Vector2(s.center), 42.0)
 		"world_tab":
 			game.hud._set_tab("world")
 		"monster":
@@ -203,6 +206,43 @@ func _do_action(action: String) -> void:
 				best_a.legend += 120.0
 				best_a.add_title("Легенда " + best_a.dynasty)
 				best_a.notable = true
+		"perks":
+			for aa3 in game.sim.agents:
+				if aa3.alive and aa3.is_adult():
+					game.selected_agent_id = aa3.id
+					game.creature_view.set_selected(aa3.id)
+					game.hud.inspect_agent(aa3)
+					game.hud.open_perk_dialog(aa3)
+					break
+		"navy":
+			if not game.sim.ships.is_empty():
+				var sh0: Dictionary = game.sim.ships[0]
+				game.camera_rig.focus_cell(Vector2(sh0.pos), 90.0)
+			else:
+				game.camera_rig.focus_cell(Vector2(s.center), 40.0)
+		"asphalt":
+			for ss in game.sim.settlements:
+				if not ss.destroyed and not ss.techs.has("roads"):
+					ss.techs.append("roads")
+					if ss.era < 2:
+						ss.era = 2
+			var paved_n := 0
+			for ss2 in game.sim.settlements:
+				for oid2 in ss2.roads:
+					if bool(ss2.roads[oid2].get("paved", false)):
+						paved_n += 1
+			print("[asphalt] paved roads=", paved_n)
+		"fortify":
+			for ss in game.sim.settlements:
+				if ss.destroyed:
+					continue
+				ss.era = maxi(ss.era, 3)
+				if not ss.techs.has("roads"):
+					ss.techs.append("roads")
+				for bt in ["walls", "tower", "bastion", "tenement", "harbor"]:
+					if ss.building_count(bt) < 1:
+						ss.add_building(bt, ss.center.x + game.sim.rng.randf_range(-5, 5), ss.center.y + game.sim.rng.randf_range(-5, 5), 0.0, game.sim.year)
+			game.settlement_view.timer = 0.0
 		"save":
 			game.save_to_slot(2, false)
 		"banner":
@@ -282,7 +322,7 @@ func _process(delta: float) -> void:
 				for sv2 in game.sim.settlements:
 					if not sv2.destroyed:
 						rels[sv2.religion] = int(rels.get(sv2.religion, 0)) + 1
-				print("[bench] fps=%d day=%d pop=%d agents=%d nodes=%d steep=%d roads=%d vassals=%d exp=%d monsters=%d legends=%d religions=%s actions=%s emotions=%s parts=%s" % [int(Engine.get_frames_per_second()), int(game.sim.day), game.sim.total_population, game.sim.agents.size(), get_tree().get_node_count(), steep, roads, vassals, game.sim.expeditions.size(), game.sim.monsters.size(), game.sim.top_legends(3).size(), str(rels), str(acts), str(emos), str(game.sim.last_parts)])
+				print("[bench] fps=%d day=%d pop=%d agents=%d nodes=%d steep=%d roads=%d vassals=%d exp=%d monsters=%d legends=%d ships=%d caravans=%d religions=%s actions=%s emotions=%s parts=%s" % [int(Engine.get_frames_per_second()), int(game.sim.day), game.sim.total_population, game.sim.agents.size(), get_tree().get_node_count(), steep, roads, vassals, game.sim.expeditions.size(), game.sim.monsters.size(), game.sim.top_legends(3).size(), game.sim.ships.size(), game.sim.caravans.size(), str(rels), str(acts), str(emos), str(game.sim.last_parts)])
 		if bench_seconds <= 0.0:
 			get_tree().quit()
 	if shot_timer > 0.0:

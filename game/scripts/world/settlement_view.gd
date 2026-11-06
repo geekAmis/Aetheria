@@ -15,6 +15,7 @@ var road_root: Node3D
 var road_sig := ""
 var road_mesh: BoxMesh
 var road_mat: StandardMaterial3D
+var road_paved_mat: StandardMaterial3D
 var last_rebuild_us := 0
 var last_roads_us := 0
 
@@ -48,6 +49,10 @@ func setup(p_world: WorldModel, p_sim: SimWorld, p_camera: CameraRig = null) -> 
 	road_mat = StandardMaterial3D.new()
 	road_mat.albedo_color = Color("#6a5638")
 	road_mat.roughness = 1.0
+	road_paved_mat = StandardMaterial3D.new()
+	road_paved_mat.albedo_color = Color("#2b2b30")
+	road_paved_mat.roughness = 0.85
+	road_paved_mat.metallic = 0.05
 	for s in sim.settlements:
 		_ensure_node(s)
 
@@ -251,61 +256,78 @@ func _get_building_mesh(type: String) -> ArrayMesh:
 	return mesh
 
 
-func _territory_mesh(s: SettlementData) -> ArrayMesh:
+func _territory_points(s: SettlementData) -> Array:
+	var seg := 18
 	var r := s.territory_radius
-	var inner := maxf(1.0, r - 1.4)
-	var seg := 72
+	var pts: Array = []
+	for i in seg:
+		var ang := TAU * i / seg
+		var dir := Vector2(cos(ang), sin(ang))
+		var rr := r * (0.88 + 0.18 * absf(sin(float(s.id) * 3.7 + i * 1.9)))
+		# граница тянется к соседу, но не заходит на его землю
+		for o in sim.settlements:
+			if o.id == s.id or o.destroyed:
+				continue
+			var to := Vector2(o.center) - Vector2(s.center)
+			var dist := to.length()
+			if dist < 1.0 or dist > r * 2.2:
+				continue
+			var dot := dir.dot(to.normalized())
+			if dot > 0.55:
+				rr = minf(rr, dist * 0.48 + 1.0)
+		pts.append(dir * rr)
+	return pts
+
+
+func _territory_mesh(s: SettlementData) -> ArrayMesh:
+	var pts := _territory_points(s)
 	var center_y := world.terrain_y(s.center.x, s.center.y)
 	var verts := PackedVector3Array()
 	var cols := PackedColorArray()
 	var idxs := PackedInt32Array()
-	var base := Color(s.color.r, s.color.g, s.color.b, 0.30)
+	var base := Color(s.color.r, s.color.g, s.color.b, 0.10)
 	if not s.wars.is_empty():
-		base = Color(0.95, 0.28, 0.2, 0.35)
+		base = Color(0.95, 0.28, 0.2, 0.16)
 	if s.destroyed:
-		base = Color(0.3, 0.28, 0.26, 0.22)
+		base = Color(0.3, 0.28, 0.26, 0.07)
 	if s.id == selected_id:
 		base = base.lightened(0.25)
-		base.a = 0.5
+		base.a = 0.30
 	var vc := 0
-	for i in seg:
-		var a0 := TAU * i / seg
-		var a1 := TAU * (i + 1) / seg
-		var o0 := Vector2(cos(a0), sin(a0))
-		var o1 := Vector2(cos(a1), sin(a1))
-		var p00 := o0 * inner
-		var p01 := o1 * inner
-		var p10 := o0 * r
-		var p11 := o1 * r
-		var defs := [p00, p10, p11, p01]
-		for d in defs:
-			var wx: float = s.center.x + d.x
-			var wz: float = s.center.y + d.y
+	var n := pts.size()
+	for i in n:
+		var p0: Vector2 = pts[i]
+		var p1: Vector2 = pts[(i + 1) % n]
+		var q0 := p0 * 0.975
+		var q1 := p1 * 0.975
+		for d in [q0, p0, p1, q1]:
+			var dv: Vector2 = d
+			var wx: float = s.center.x + dv.x
+			var wz: float = s.center.y + dv.y
 			var y: float = world.terrain_y(wx, wz) - center_y
-			verts.append(Vector3(d.x * WorldModel.CELL, y + 0.12, d.y * WorldModel.CELL))
+			verts.append(Vector3(dv.x * WorldModel.CELL, y + 0.12, dv.y * WorldModel.CELL))
 			cols.append(base)
 		idxs.append(vc); idxs.append(vc + 1); idxs.append(vc + 2)
 		idxs.append(vc); idxs.append(vc + 2); idxs.append(vc + 3)
 		vc += 4
 	if s.id == selected_id:
 		var gold := Color(1.0, 0.82, 0.38, 0.78)
-		for i in seg:
-			var a0 := TAU * i / seg
-			var a1 := TAU * (i + 1) / seg
-			var o0 := Vector2(cos(a0), sin(a0))
-			var o1 := Vector2(cos(a1), sin(a1))
-			var rr0 := r + 0.25
-			var rr1 := r + 0.9
-			var pp := [o0 * rr0, o0 * rr1, o1 * rr1, o1 * rr0]
-			for d2 in pp:
-				var dv: Vector2 = d2
-				var wx: float = s.center.x + dv.x
-				var wz: float = s.center.y + dv.y
+		for i in n:
+			var p0: Vector2 = pts[i]
+			var p1: Vector2 = pts[(i + 1) % n]
+			var q0 := p0 * 1.015
+			var q1 := p1 * 1.015
+			var q2 := p1 * 1.05
+			var q3 := p0 * 1.05
+			for d2 in [q0, q1, q2, q3]:
+				var dv2: Vector2 = d2
+				var wx: float = s.center.x + dv2.x
+				var wz: float = s.center.y + dv2.y
 				var yy: float = world.terrain_y(wx, wz) - center_y
-				verts.append(Vector3(dv.x * WorldModel.CELL, yy + 0.16, dv.y * WorldModel.CELL))
+				verts.append(Vector3(dv2.x * WorldModel.CELL, yy + 0.16, dv2.y * WorldModel.CELL))
 				cols.append(gold)
-			idxs.append(vc); idxs.append(vc + 1); idxs.append(vc + 2)
-			idxs.append(vc); idxs.append(vc + 2); idxs.append(vc + 3)
+			idxs.append(vc); idxs.append(vc + 2); idxs.append(vc + 1)
+			idxs.append(vc); idxs.append(vc + 3); idxs.append(vc + 2)
 			vc += 4
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
@@ -402,21 +424,22 @@ func _rebuild_roads() -> void:
 			continue
 		for oid in s.roads:
 			var r: Dictionary = s.roads[oid]
-			sig += "%d:%d:%.2f:%d;" % [s.id, int(oid), float(r.get("progress", 0.0)), int(r.get("segments", []).size())]
+			sig += "%d:%d:%.2f:%d:%s;" % [s.id, int(oid), float(r.get("progress", 0.0)), int(r.get("segments", []).size()), str(bool(r.get("paved", false)))]
 	if sig == road_sig:
 		last_roads_us = Time.get_ticks_usec() - tr0
 		return
 	road_sig = sig
 	for c in road_root.get_children():
 		c.queue_free()
-	# собираем все сегменты в один MultiMesh
-	var transforms: Array = []
+	var dirt: Array = []
+	var paved: Array = []
 	for s in sim.settlements:
 		if s.destroyed:
 			continue
 		for oid in s.roads:
 			var r: Dictionary = s.roads[oid]
 			var segs: Array = r.get("segments", [])
+			var is_paved := bool(r.get("paved", false))
 			for i in segs.size():
 				var seg: Array = segs[i]
 				var x := float(seg[0])
@@ -427,29 +450,37 @@ func _rebuild_roads() -> void:
 				var dd := Vector2(float(nxt[0]) - x, float(nxt[1]) - z)
 				if dd.length() > 0.01:
 					dir = dd.normalized()
-				transforms.append([x, z, atan2(dir.x, dir.y)])
-	if transforms.is_empty():
-		last_roads_us = Time.get_ticks_usec() - tr0
-		return
+				var item := [x, z, atan2(dir.x, dir.y)]
+				if is_paved:
+					paved.append(item)
+				else:
+					dirt.append(item)
+	var half := world.size * 0.5
+	if not dirt.is_empty():
+		_spawn_road_mm(dirt, road_mat, "RoadDirt", half)
+	if not paved.is_empty():
+		_spawn_road_mm(paved, road_paved_mat, "RoadPaved", half)
+	last_roads_us = Time.get_ticks_usec() - tr0
+
+
+func _spawn_road_mm(items: Array, mat: Material, node_name: String, half: float) -> void:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.mesh = road_mesh
-	mm.instance_count = transforms.size()
-	var half := world.size * 0.5
-	for i in transforms.size():
-		var tr: Array = transforms[i]
+	mm.instance_count = items.size()
+	for i in items.size():
+		var tr: Array = items[i]
 		var x := float(tr[0])
 		var z := float(tr[1])
 		var wy := world.terrain_y(x, z) + 0.10
 		var basis := Basis(Vector3.UP, float(tr[2]))
 		mm.set_instance_transform(i, Transform3D(basis, Vector3((x - half) * WorldModel.CELL, wy, (z - half) * WorldModel.CELL)))
 	var mmi := MultiMeshInstance3D.new()
-	mmi.name = "RoadMesh"
+	mmi.name = node_name
 	mmi.multimesh = mm
-	mmi.material_override = road_mat
+	mmi.material_override = mat
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	road_root.add_child(mmi)
-	last_roads_us = Time.get_ticks_usec() - tr0
 
 
 func select(id: int) -> void:

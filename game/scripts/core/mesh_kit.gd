@@ -330,6 +330,51 @@ static func accessory_mesh(kind: int) -> ArrayMesh:
 	return commit(st)
 
 
+static func tool_mesh(kind: String) -> ArrayMesh:
+	var st := _st()
+	if kind == "hammer":
+		cylinder(st, Vector3(0, 0, 0), 0.035, 0.55, Color("#6a4a2a"), 5)
+		box(st, Vector3(0.12, 0.55, 0), Vector3(0.24, 0.12, 0.12), Color("#9a9aa2"))
+	elif kind == "spear":
+		cylinder(st, Vector3(0, 0, 0), 0.025, 0.9, Color("#6a4a2a"), 5)
+		cone(st, Vector3(0, 0.9, 0), 0.06, 0.22, Color("#c8c8d0"), 4)
+	else:
+		cylinder(st, Vector3(0, 0, 0), 0.035, 0.6, Color("#6a4a2a"), 5)
+		box(st, Vector3(0.16, 0.62, 0), Vector3(0.34, 0.08, 0.10), Color("#8a8a92"))
+		cone(st, Vector3(0.33, 0.62, 0), 0.08, 0.16, Color("#c8c8d0"), 4)
+	return commit(st)
+
+
+static func ship_mesh(kind: String) -> ArrayMesh:
+	var st := _st()
+	var hull_col := Color("#6a4a2a")
+	var sail_col := Color("#e8e2d2")
+	var size := 1.0
+	if kind == "cargo":
+		hull_col = Color("#5a4a3a")
+		sail_col = Color("#c8b890")
+		size = 1.25
+	elif kind == "warship":
+		hull_col = Color("#3a2a2a")
+		sail_col = Color("#b83a2a")
+		size = 1.1
+	# корпус
+	sphere(st, Vector3(0, 0.18, 0), 0.42 * size, hull_col, 7, 4, Vector3(2.6, 0.55, 0.9))
+	cone(st, Vector3(1.05 * size, 0.2, 0), 0.22 * size, 0.6, hull_col.lightened(0.08), 5)
+	box(st, Vector3(-0.1, 0.32, 0), Vector3(1.2 * size, 0.10, 0.7 * size), Color("#8a6a42"))
+	# мачта и парус
+	cylinder(st, Vector3(0.1, 0.35, 0), 0.035, 1.5 * size, Color("#4a3420"), 5)
+	box(st, Vector3(0.1, 1.05 * size, 0), Vector3(0.05, 0.9 * size, 0.65 * size), sail_col)
+	if kind == "warship":
+		box(st, Vector3(0.1, 1.55 * size, 0), Vector3(0.04, 0.28, 0.28), Color("#e8d07a"))
+		for i in 3:
+			cylinder(st, Vector3(-0.2 + i * 0.28, 0.18, 0.38), 0.02, 0.4, Color("#3a2a1a"), 4)
+	# вёсла/мачты
+	for zz in [-0.32, 0.32]:
+		cylinder(st, Vector3(-0.4, 0.22, zz), 0.025, 0.55, Color("#5a4028"), 4)
+	return commit(st)
+
+
 static func monster_mesh(kind: String) -> ArrayMesh:
 	var st := _st()
 	match kind:
@@ -436,6 +481,36 @@ static func building_mesh(type: String, data: Dictionary) -> ArrayMesh:
 			box(st, Vector3(0, h * 0.35, 0), Vector3(s * 1.8, h * 0.7, s * 0.32), col)
 			for i in 4:
 				box(st, Vector3(-s * 0.7 + i * s * 0.47, h * 0.78, 0), Vector3(s * 0.16, h * 0.18, s * 0.34), col.darkened(0.08))
+		"tower", "bastion":
+			var tw := s * (0.9 if type == "bastion" else 0.65)
+			var th := h * (1.8 if type == "bastion" else 2.3)
+			box(st, Vector3(0, th * 0.45, 0), Vector3(tw, th * 0.9, tw), col.darkened(0.05))
+			box(st, Vector3(0, th * 0.92, 0), Vector3(tw * 1.2, th * 0.12, tw * 1.2), col)
+			for i in 4:
+				var ax := (i % 2) * 2 - 1
+				var az := (i / 2) * 2 - 1
+				box(st, Vector3(ax * tw * 0.6, th * 1.02, az * tw * 0.6), Vector3(tw * 0.2, th * 0.12, tw * 0.2), col.darkened(0.1))
+			# бойницы
+			for i in 3:
+				var yy := th * (0.3 + i * 0.22)
+				box(st, Vector3(0, yy, tw * 0.51), Vector3(tw * 0.10, th * 0.09, 0.04), Color("#141414"))
+				box(st, Vector3(tw * 0.51, yy, 0), Vector3(0.04, th * 0.09, tw * 0.10), Color("#141414"))
+		"tenement", "highrise":
+			var floors := 4 if type == "highrise" else 3
+			var bh := h * (2.4 if type == "highrise" else 1.8)
+			box(st, Vector3(0, bh * 0.5, 0), Vector3(s * 0.9, bh, s * 0.8), col)
+			box(st, Vector3(0, bh + 0.06, 0), Vector3(s * 1.0, 0.12, s * 0.9), roof)
+			for f in floors:
+				var fy := bh * (0.18 + 0.2 * f)
+				for wx in [-0.28, 0.0, 0.28]:
+					box(st, Vector3(wx * s, fy, s * 0.41), Vector3(s * 0.12, bh * 0.07, 0.04), Color("#f0d890"))
+					box(st, Vector3(s * 0.46, fy, wx * s), Vector3(0.04, bh * 0.07, s * 0.12), Color("#f0d890"))
+		"harbor":
+			box(st, Vector3(0, 0.12, 0), Vector3(s * 1.6, 0.18, s * 0.8), Color("#6a5032"))
+			for i in 5:
+				box(st, Vector3(-s * 0.7 + i * s * 0.36, 0.04, 0), Vector3(0.08, 0.3, s * 0.9), Color("#5a4028"))
+			box(st, Vector3(s * 0.4, h * 0.45, 0), Vector3(s * 0.45, h * 0.75, s * 0.4), col)
+			cylinder(st, Vector3(-s * 0.35, 0.2, -s * 0.15), 0.05, h * 1.4, Color("#5a4028"), 5)
 		"mine":
 			box(st, Vector3(0, h * 0.4, 0), Vector3(s * 0.9, h * 0.8, s * 0.6), col)
 			box(st, Vector3(0, h * 0.28, s * 0.32), Vector3(s * 0.3, h * 0.55, 0.2), Color("#161616"))
