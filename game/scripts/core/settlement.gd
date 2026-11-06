@@ -49,6 +49,16 @@ var water_cell: Vector2i = Vector2i(-1, -1)
 var water_day: int = -999
 var known: Dictionary = {}          # id -> true
 var roads: Dictionary = {}          # id -> {progress, segments, condition}
+# --- Living Legends: религия, вассалитет, династия ---
+var religion: String = ""
+var zeal: float = 40.0
+var holy_war: bool = false
+var overlord_id: int = -1
+var vassals: Array = []
+var tribute_rate: float = 0.12
+var dynasty: String = ""
+var founded_by: int = -1
+var specialization: String = "balanced"
 
 const STAGE_POPS := {"camp": 0, "village": 15, "town": 55, "city": 150, "metropolis": 350}
 const STAGE_RADIUS := {"camp": 7.0, "village": 11.0, "town": 17.0, "city": 25.0, "metropolis": 34.0}
@@ -248,7 +258,10 @@ func to_dict() -> Dictionary:
 		"destroyed": destroyed, "nuked": nuked, "total_births": total_births,
 		"total_deaths": total_deaths, "prosperity": prosperity,
 		"water_cell": [water_cell.x, water_cell.y], "water_day": water_day,
-		"known": known, "roads": roads
+		"known": known, "roads": roads,
+		"religion": religion, "zeal": zeal, "holy_war": holy_war,
+		"overlord_id": overlord_id, "vassals": vassals, "tribute_rate": tribute_rate,
+		"dynasty": dynasty, "founded_by": founded_by, "specialization": specialization
 	}
 
 
@@ -314,5 +327,16 @@ static func from_dict(d: Dictionary) -> SettlementData:
 		var rr: Dictionary = rd[k]
 		rr["to"] = int(rr.get("to", k))
 		s.roads[int(k)] = rr
+	s.religion = str(d.get("religion", ""))
+	s.zeal = float(d.get("zeal", 40))
+	s.holy_war = bool(d.get("holy_war", false))
+	s.overlord_id = int(d.get("overlord_id", -1))
+	s.vassals = []
+	for v in d.get("vassals", []):
+		s.vassals.append(int(v))
+	s.tribute_rate = float(d.get("tribute_rate", 0.12))
+	s.dynasty = str(d.get("dynasty", ""))
+	s.founded_by = int(d.get("founded_by", -1))
+	s.specialization = str(d.get("specialization", "balanced"))
 	s.color = D.race(s.race_id).get("color_c", Color.WHITE)
 	return s

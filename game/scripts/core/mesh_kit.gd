@@ -330,6 +330,51 @@ static func accessory_mesh(kind: int) -> ArrayMesh:
 	return commit(st)
 
 
+static func monster_mesh(kind: String) -> ArrayMesh:
+	var st := _st()
+	match kind:
+		"dragon", "wyvern":
+			var slim := 1.0 if kind == "dragon" else 0.75
+			var body := Color("#8a2a22") if kind == "dragon" else Color("#4a3a6a")
+			# тело
+			sphere(st, Vector3(0, 1.1, 0), 0.75 * slim, body, 8, 5, Vector3(1.7, 0.9, 0.9))
+			# шея и голова
+			cylinder(st, Vector3(0.9, 1.25, 0), 0.25, 0.9, body.darkened(0.1), 6)
+			sphere(st, Vector3(1.35, 1.5, 0), 0.36, body.lightened(0.1), 7, 4, Vector3(1.3, 0.9, 0.9))
+			cone(st, Vector3(1.7, 1.55, 0), 0.12, 0.5, Color("#e8d8a0"), 5)
+			# крылья
+			box(st, Vector3(-0.1, 1.65, 0.85), Vector3(1.5, 0.06, 1.1), Color("#5a1a18"))
+			box(st, Vector3(-0.1, 1.65, -0.85), Vector3(1.5, 0.06, 1.1), Color("#5a1a18"))
+			# хвост
+			cylinder(st, Vector3(-0.9, 1.0, 0), 0.18, 1.4, body, 5)
+			# лапы
+			for zz in [-0.5, 0.5]:
+				cylinder(st, Vector3(0.35, 0.35, zz), 0.13, 0.75, body.darkened(0.2), 5)
+			# глаза
+			sphere(st, Vector3(1.5, 1.58, 0.16), 0.05, Color("#ffd84a"), 5, 3)
+			sphere(st, Vector3(1.5, 1.58, -0.16), 0.05, Color("#ffd84a"), 5, 3)
+		"undead":
+			var bone := Color("#9aa89a")
+			cylinder(st, Vector3(-0.12, 0, 0), 0.08, 0.9, bone.darkened(0.3), 5)
+			cylinder(st, Vector3(0.12, 0, 0), 0.08, 0.9, bone.darkened(0.3), 5)
+			cylinder(st, Vector3(0, 0.55, 0), 0.28, 1.0, Color("#3a4a3a"), 6, 0.2)
+			sphere(st, Vector3(0, 1.65, 0), 0.22, bone, 8, 5)
+			sphere(st, Vector3(-0.08, 1.68, 0.18), 0.04, Color("#6aff6a"), 5, 3)
+			sphere(st, Vector3(0.08, 1.68, 0.18), 0.04, Color("#6aff6a"), 5, 3)
+			cylinder(st, Vector3(0.45, 0.7, 0), 0.05, 0.9, Color("#5a4a2a"), 5)
+		_:
+			# великан
+			cylinder(st, Vector3(-0.2, 0, 0), 0.14, 0.9, Color("#4a3a2a"), 5)
+			cylinder(st, Vector3(0.2, 0, 0), 0.14, 0.9, Color("#4a3a2a"), 5)
+			cylinder(st, Vector3(0, 0.65, 0), 0.5, 1.25, Color("#8a6a4a"), 7, 0.25)
+			sphere(st, Vector3(0, 1.95, 0), 0.38, Color("#b08a6a"), 8, 5)
+			cylinder(st, Vector3(-0.62, 0.75, 0), 0.12, 1.0, Color("#8a6a4a"), 5)
+			cylinder(st, Vector3(0.62, 0.75, 0), 0.12, 1.0, Color("#8a6a4a"), 5)
+			cylinder(st, Vector3(0.9, 0.1, 0.1), 0.12, 1.6, Color("#5a4a2a"), 6)
+			box(st, Vector3(0.95, 1.7, 0.1), Vector3(0.4, 0.5, 0.4), Color("#6a5a4a"))
+	return commit(st)
+
+
 static func animal_mesh() -> ArrayMesh:
 	var st := _st()
 	# тело

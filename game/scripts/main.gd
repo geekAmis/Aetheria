@@ -189,6 +189,20 @@ func _do_action(action: String) -> void:
 					break
 		"inspect_settlement":
 			game.select_settlement(s.id)
+		"world_tab":
+			game.hud._set_tab("world")
+		"monster":
+			game.sim._spawn_monster("dragon", Vector2i(clampi(s.center.x + 7, 1, game.world.size - 2), s.center.y))
+			game.sim._add_world_event("monster", "Дракон пробудился", 4, "monster")
+		"legend":
+			var best_a: AgentData = null
+			for aa2 in game.sim.agents:
+				if aa2.alive and (best_a == null or aa2.legend_score() < best_a.legend_score()):
+					best_a = aa2
+			if best_a != null:
+				best_a.legend += 120.0
+				best_a.add_title("Легенда " + best_a.dynasty)
+				best_a.notable = true
 		"save":
 			game.save_to_slot(2, false)
 		"banner":
@@ -246,21 +260,29 @@ func _process(delta: float) -> void:
 					emos[a.emotion] = int(emos.get(a.emotion, 0)) + 1
 				var steep := 0
 				var roads := 0
-				for s2 in game.sim.settlements:
+				var vassals := 0
+				for sv in game.sim.settlements:
+					var s2: SettlementData = sv
 					if s2.destroyed:
 						continue
+					if s2.overlord_id >= 0:
+						vassals += 1
 					for oid in s2.roads:
 						if float(s2.roads[oid].get("progress", 0.0)) >= 1.0:
 							roads += 1
-					var h0 := game.world.heights[game.world.idx(s2.center.x, s2.center.y)]
+					var h0: float = game.world.heights[game.world.idx(s2.center.x, s2.center.y)]
 					var relief := 0.0
 					for dz in range(-3, 4):
 						for dx in range(-3, 4):
-							var hh := game.world.heights[game.world.idx(clampi(s2.center.x + dx, 0, game.world.size - 1), clampi(s2.center.y + dz, 0, game.world.size - 1))]
+							var hh: float = game.world.heights[game.world.idx(clampi(s2.center.x + dx, 0, game.world.size - 1), clampi(s2.center.y + dz, 0, game.world.size - 1))]
 							relief = maxf(relief, absf(hh - h0))
 					if relief > 0.052:
 						steep += 1
-				print("[bench] fps=%d day=%d pop=%d agents=%d nodes=%d steep=%d roads=%d exp=%d actions=%s emotions=%s" % [int(Engine.get_frames_per_second()), int(game.sim.day), game.sim.total_population, game.sim.agents.size(), get_tree().get_node_count(), steep, roads, game.sim.expeditions.size(), str(acts), str(emos)])
+				var rels := {}
+				for sv2 in game.sim.settlements:
+					if not sv2.destroyed:
+						rels[sv2.religion] = int(rels.get(sv2.religion, 0)) + 1
+				print("[bench] fps=%d day=%d pop=%d agents=%d nodes=%d steep=%d roads=%d vassals=%d exp=%d monsters=%d legends=%d religions=%s actions=%s emotions=%s parts=%s" % [int(Engine.get_frames_per_second()), int(game.sim.day), game.sim.total_population, game.sim.agents.size(), get_tree().get_node_count(), steep, roads, vassals, game.sim.expeditions.size(), game.sim.monsters.size(), game.sim.top_legends(3).size(), str(rels), str(acts), str(emos), str(game.sim.last_parts)])
 		if bench_seconds <= 0.0:
 			get_tree().quit()
 	if shot_timer > 0.0:

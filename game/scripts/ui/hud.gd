@@ -17,6 +17,8 @@ signal god_agent_action(kind: String)
 signal favourite_toggled(id: int)
 signal rename_agent_requested(id: int)
 signal spawn_requested(kind: String, data: Dictionary)
+signal inspect_agent_requested(id: int)
+signal spawn_monster_requested(kind: String)
 signal server_settings_changed
 
 var game: GameSession
@@ -74,6 +76,7 @@ var inspector_sig := ""
 var inspector_kind := ""
 var inspector_id := -1
 var inspector_cell := Vector2i(-1, -1)
+var inspector_build_ms := 0
 var world_sig := ""
 var flash_alpha := 0.0
 var flash_life := 0.0
@@ -653,6 +656,10 @@ func refresh_inspector() -> void:
 		if kind == "agent" and a != null:
 			_refresh_agent_live(a)
 		return
+	var now_ms := Time.get_ticks_msec()
+	if kind == inspector_kind and id == inspector_id and now_ms - inspector_build_ms < 900:
+		return
+	inspector_build_ms = now_ms
 	inspector_sig = sig
 	inspector_kind = kind
 	inspector_id = id
@@ -716,6 +723,20 @@ func _build_agent_card(a: AgentData) -> void:
 	chips2.add_child(live_immortal_chip)
 	panel_content.add_child(chips2)
 	_refresh_agent_live(a)
+	var chips3 := _hbox(4)
+	if not a.religion.is_empty():
+		chips3.add_child(_chip(sim.religion_name(a.religion), sim.religion_color(a.religion)))
+	if not a.dynasty.is_empty():
+		chips3.add_child(_chip("Дом " + a.dynasty, ThemeBuilder.TEAL))
+	if a.heir:
+		chips3.add_child(_chip("Наследник", ThemeBuilder.GOLD))
+	chips3.add_child(_chip("Слава %d" % int(a.legend_score()), ThemeBuilder.GOLD_BRIGHT))
+	panel_content.add_child(chips3)
+	if not a.titles.is_empty():
+		var th := _hbox(3)
+		for t in a.titles.slice(0, 3):
+			th.add_child(_chip(str(t), Color("#e8d07a")))
+		panel_content.add_child(th)
 	panel_content.add_child(_hairline())
 
 	var hp := _bar("HP", a.health, a.max_health, Color("#c85048"))
@@ -765,6 +786,16 @@ func _build_agent_card(a: AgentData) -> void:
 		fam += ("   " if fam != "" else "") + "Дети: " + str(a.children.size())
 	if fam != "":
 		panel_content.add_child(_lbl(fam, "Small", ThemeBuilder.MUTED, 11))
+	# характер и память
+	var tr := _hbox(6)
+	tr.add_child(_lbl("Амбиции %d" % int(a.personality("ambition")), "Small", ThemeBuilder.MUTED, 10))
+	tr.add_child(_lbl("Верность %d" % int(a.personality("loyalty")), "Small", ThemeBuilder.MUTED, 10))
+	tr.add_child(_lbl("Агрессия %d" % int(a.personality("aggression")), "Small", ThemeBuilder.MUTED, 10))
+	panel_content.add_child(tr)
+	if not a.memory.is_empty():
+		for i in range(maxi(0, a.memory.size() - 3), a.memory.size()):
+			var mem: Dictionary = a.memory[i]
+			panel_content.add_child(_lbl("• " + str(mem.get("text", "")), "Small", ThemeBuilder.MUTED, 10))
 	panel_content.add_child(_hairline())
 	var god := _hbox(4)
 	var heal_b := _button("Исцелить", "GhostButton")
@@ -890,11 +921,31 @@ func _build_settlement_card(s: SettlementData) -> void:
 		chips.add_child(_chip("Дорог: %d" % roads_done, Color("#b0a06b")))
 	if not s.known.is_empty():
 		chips.add_child(_chip("Знакомы: %d" % s.known.size(), ThemeBuilder.MUTED))
+	if not s.religion.is_empty():
+		chips.add_child(_chip(sim.religion_name(s.religion), sim.religion_color(s.religion)))
+	if s.overlord_id >= 0:
+		var ov: SettlementData = sim.settlement_by_id.get(s.overlord_id, null)
+		chips.add_child(_chip("Вассал " + (ov.name if ov != null else "?"), ThemeBuilder.RED))
+	elif not s.vassals.is_empty():
+		chips.add_child(_chip("Сюзерен: %d" % s.vassals.size(), ThemeBuilder.GOLD))
 	panel_content.add_child(chips)
 	# лидер
 	var leader: AgentData = sim.agent_by_id.get(s.leader_id, null)
 	if leader != null:
 		panel_content.add_child(_info_row("leader", L.t("leader"), leader.display_name(), ThemeBuilder.GOLD_BRIGHT))
+	if not s.dynasty.is_empty():
+		panel_content.add_child(_info_row("crown", "Династия", s.dynasty, ThemeBuilder.GOLD))
+	panel_content.add_child(_info_row("faith", "Вера", "%s · рвение %d%%" % [sim.religion_name(s.religion), int(s.zeal)], sim.religion_color(s.religion)))
+	if s.overlord_id >= 0:
+		var ov2: SettlementData = sim.settlement_by_id.get(s.overlord_id, null)
+		panel_content.add_child(_info_row("crown", "Сюзерен", ov2.name if ov2 != null else "?", ThemeBuilder.RED))
+	elif not s.vassals.is_empty():
+		var vassal_names: Array = []
+		for vid in s.vassals:
+			var vs: SettlementData = sim.settlement_by_id.get(int(vid), null)
+			if vs != null:
+				vassal_names.append(vs.name)
+		panel_content.add_child(_info_row("crown", "Вассалы", ", ".join(PackedStringArray(vassal_names)), ThemeBuilder.GOLD_BRIGHT))
 	panel_content.add_child(_hairline())
 	# ресурсы
 	var res := GridContainer.new()
@@ -1027,7 +1078,7 @@ func _build_chronicle() -> void:
 	var chips := HFlowContainer.new()
 	chips.add_theme_constant_override("h_separation", 3)
 	chips.add_theme_constant_override("v_separation", 3)
-	for f in [["all", L.t("all")], ["war", L.t("wars")], ["disaster", L.t("disasters")], ["founded", L.t("founded")], ["tech", L.t("technology")], ["miracle", L.t("miracles")]]:
+	for f in [["all", L.t("all")], ["war", L.t("wars")], ["disaster", L.t("disasters")], ["faith", "Вера"], ["legend", "Легенды"], ["monster", "Чудовища"], ["founded", L.t("founded")], ["tech", L.t("technology")], ["miracle", L.t("miracles")]]:
 		var b := _button(str(f[1]), "Chip")
 		b.toggle_mode = true
 		b.button_pressed = chronicle_filter == f[0]
@@ -1070,6 +1121,12 @@ func _event_matches(e: Dictionary) -> bool:
 		return t in ["tech", "era"]
 	if chronicle_filter == "miracle":
 		return t in ["miracle", "prophet", "bless", "curse", "festival"]
+	if chronicle_filter == "faith":
+		return t in ["faith", "prophet", "bless", "curse"]
+	if chronicle_filter == "legend":
+		return t in ["legend", "leader", "feud", "birth"]
+	if chronicle_filter == "monster":
+		return t in ["monster", "war"]
 	return true
 
 
@@ -1119,7 +1176,10 @@ func _event_color(t: String) -> Color:
 		"disaster", "plague": return Color("#d8a24a")
 		"founded", "people": return ThemeBuilder.GOLD
 		"tech", "era": return ThemeBuilder.TEAL
-		"miracle", "bless", "prophet", "festival": return Color("#e8d07a")
+		"miracle", "bless", "prophet", "festival", "faith": return Color("#e8d07a")
+		"legend", "crown", "leader": return ThemeBuilder.GOLD_BRIGHT
+		"monster", "revolt", "feud", "sword": return Color("#d85a4a")
+		"road", "flag", "scout": return Color("#b0a06b")
 		"curse": return Color("#a06ad8")
 		"death": return Color("#9a9a9a")
 		_:
@@ -1149,6 +1209,31 @@ func _build_world_tab() -> void:
 		b.pressed.connect(func(): layer_changed.emit(ll))
 		layers.add_child(b)
 	panel_content.add_child(layers)
+	var legends := sim.top_legends(6)
+	if not legends.is_empty():
+		panel_content.add_child(_hairline())
+		panel_content.add_child(_lbl("Легенды", "Small", ThemeBuilder.GOLD_BRIGHT, 11))
+		for a in legends:
+			var lb := _button("%s · %s · слава %d" % [a.display_name(), L.t("role_" + a.role), int(a.legend_score())], "GhostButton")
+			lb.add_theme_font_size_override("font_size", 11)
+			lb.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			var aid: int = a.id
+			lb.pressed.connect(func(): inspect_agent_requested.emit(aid))
+			panel_content.add_child(lb)
+	var favs: Array = []
+	for a in sim.agents:
+		if a.alive and a.favourite:
+			favs.append(a)
+	if not favs.is_empty():
+		panel_content.add_child(_hairline())
+		panel_content.add_child(_lbl("Избранные", "Small", ThemeBuilder.GOLD, 11))
+		for a in favs.slice(0, 5):
+			var fb := _button("%s · %s" % [a.display_name(), L.t("role_" + a.role)], "GhostButton")
+			fb.add_theme_font_size_override("font_size", 11)
+			fb.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			var fid: int = a.id
+			fb.pressed.connect(func(): inspect_agent_requested.emit(fid))
+			panel_content.add_child(fb)
 	panel_content.add_child(_hairline())
 	var counts := world.biome_counts()
 	var land := 0
@@ -1194,6 +1279,34 @@ func _build_world_tab() -> void:
 		shown += 1
 		if shown >= 8:
 			break
+	# религии
+	var rel_counts := {}
+	for s in sim.settlements:
+		if not s.destroyed:
+			rel_counts[s.religion] = int(rel_counts.get(s.religion, 0)) + 1
+	if not rel_counts.is_empty():
+		panel_content.add_child(_hairline())
+		panel_content.add_child(_lbl("Вера", "Small", ThemeBuilder.TEAL, 11))
+		for rid in rel_counts:
+			var row := _hbox(4)
+			row.add_child(_lbl(sim.religion_name(str(rid)), "Small", sim.religion_color(str(rid)), 11))
+			row.add_child(_spacer())
+			row.add_child(_lbl(str(rel_counts[rid]), "", ThemeBuilder.TEXT, 11))
+			panel_content.add_child(row)
+	# королевства
+	var kingdoms := 0
+	for s in sim.settlements:
+		if not s.destroyed and not s.vassals.is_empty():
+			kingdoms += 1
+	if kingdoms > 0:
+		panel_content.add_child(_hairline())
+		panel_content.add_child(_lbl("Королевства: %d" % kingdoms, "Small", ThemeBuilder.GOLD, 11))
+	# угрозы
+	if not sim.monsters.is_empty():
+		panel_content.add_child(_hairline())
+		panel_content.add_child(_lbl("Угрозы", "Small", ThemeBuilder.RED, 11))
+		for m in sim.monsters:
+			panel_content.add_child(_lbl("%s · HP %d%%" % [str(m.get("name", "чудовище")), int(100.0 * float(m.get("hp", 1)) / maxf(1.0, float(m.get("max_hp", 1))))], "Small", ThemeBuilder.RED, 11))
 	var spawn_row := _hbox(4)
 	var c1 := _button("+ Существо", "GoldButton")
 	c1.add_theme_font_size_override("font_size", 11)
@@ -1204,7 +1317,21 @@ func _build_world_tab() -> void:
 	c2.pressed.connect(func(): open_spawn_dialog("animal"))
 	spawn_row.add_child(c2)
 	panel_content.add_child(spawn_row)
-	world_sig = "%d_%d_%d" % [sim.year, sim.total_population, sim.settlements.size()]
+	var threat_row := _hbox(4)
+	var th1 := _button("Дракон", "GhostButton")
+	th1.add_theme_font_size_override("font_size", 11)
+	th1.pressed.connect(func(): spawn_monster_requested.emit("dragon"))
+	threat_row.add_child(th1)
+	var th2 := _button("Великан", "GhostButton")
+	th2.add_theme_font_size_override("font_size", 11)
+	th2.pressed.connect(func(): spawn_monster_requested.emit("giant"))
+	threat_row.add_child(th2)
+	var th3 := _button("Нежить", "GhostButton")
+	th3.add_theme_font_size_override("font_size", 11)
+	th3.pressed.connect(func(): spawn_monster_requested.emit("undead"))
+	threat_row.add_child(th3)
+	panel_content.add_child(threat_row)
+	world_sig = "%d_%d_%d_%d" % [sim.year, sim.total_population, sim.settlements.size(), sim.animals.size()]
 
 
 func open_spawn_dialog(kind: String) -> void:
@@ -1259,14 +1386,14 @@ func open_spawn_dialog(kind: String) -> void:
 	modal_content.add_child(create)
 
 
-func stats_changed() -> void:	if panel_tab == "world":
+func stats_changed() -> void:
+	if panel_tab == "world":
 		var sig := "%d_%d_%d_%d" % [sim.year, sim.total_population, sim.settlements.size(), sim.animals.size()]
-		if sig != world_sig:
-			stats_refresh += 0.22
-			if stats_refresh > 1.2:
-				stats_refresh = 0.0
-				world_sig = sig
-				_build_world_tab()
+		stats_refresh += 0.22
+		if sig != world_sig and stats_refresh > 4.0:
+			stats_refresh = 0.0
+			world_sig = sig
+			_build_world_tab()
 
 
 # ------------------------------------------------------------------ top updates

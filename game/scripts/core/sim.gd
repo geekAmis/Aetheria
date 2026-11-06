@@ -5,6 +5,17 @@ extends RefCounted
 ## Ничего не знает о рендере; общается через сигналы.
 
 const VARIANTS_COUNT := 8
+const RELIGIONS := [
+	{"id": "sun", "name": "Солнечный Орден", "color": "#e8c04a"},
+	{"id": "moon", "name": "Лунный Ковен", "color": "#9a8ad8"},
+	{"id": "forest", "name": "Дети Леса", "color": "#4aa85a"},
+	{"id": "flame", "name": "Пламенный Путь", "color": "#d85a3a"},
+	{"id": "deep", "name": "Глубинные", "color": "#3a8ad8"},
+	{"id": "bone", "name": "Костяной Хор", "color": "#c8c8c8"},
+	{"id": "storm", "name": "Грозовой Круг", "color": "#6a8ad8"},
+	{"id": "harvest", "name": "Мать Урожая", "color": "#d8a24a"}
+]
+const MONSTER_KINDS := ["dragon", "undead", "giant", "wyvern"]
 
 signal chronicle_added(entry: Dictionary)
 signal agent_spawned(agent: AgentData)
@@ -56,6 +67,9 @@ var next_expedition_id: int = 1
 var last_step_us: int = 0
 var last_parts: Dictionary = {}
 var heavy_step_fresh := false
+var monsters: Array = []
+var next_monster_id: int = 1
+var agents_cap: int = 900
 
 
 func setup(p_world: WorldModel, p_config: Dictionary) -> void:
@@ -72,6 +86,7 @@ func setup(p_world: WorldModel, p_config: Dictionary) -> void:
 	war_intensity = 0.0
 	agents.clear(); agent_by_id.clear(); settlements.clear(); settlement_by_id.clear()
 	animals.clear(); animal_by_id.clear()
+	monsters.clear(); next_monster_id = 1
 	next_agent_id = 1; next_settlement_id = 1; next_animal_id = 1
 	burning.clear()
 	event_cooldowns.clear()
@@ -87,6 +102,9 @@ func populate(progress: Callable = Callable()) -> void:
 		var s := SettlementData.new()
 		s.setup(next_settlement_id, str(site.race), site.cell, year, rng)
 		s.name = _unique_name(s.name, s.id)
+		var rel: Dictionary = RELIGIONS[rng.randi() % RELIGIONS.size()]
+		s.religion = str(rel.id)
+		s.zeal = rng.randf_range(30.0, 65.0)
 		next_settlement_id += 1
 		# стартовые постройки
 		if genesis:
@@ -127,6 +145,13 @@ func populate(progress: Callable = Callable()) -> void:
 			for i in rng.randi_range(2, 4):
 				spawn_agent(s, rng.randf_range(0.5, 12.0), rng.randi() % 2, "child", Vector2(s.center) + Vector2(rng.randf_range(-2, 2), rng.randf_range(-2, 2)))
 		_assign_leader(s)
+		for aa in agents:
+			if aa.settlement_id == s.id:
+				s.founded_by = aa.id
+				break
+		var ld: AgentData = agent_by_id.get(s.leader_id, null)
+		if ld != null:
+			s.dynasty = ld.dynasty
 		# отношения
 		for other in settlements:
 			if other.id != s.id:
@@ -162,7 +187,12 @@ func step_day() -> void:
 	_update_settlement_counts()
 	_time_part("agents", func(): _agents_daily())
 	_time_part("settle", func(): _settlements_daily())
+	if total_population < 30 and _active_wars_count() > 0:
+		_emergency_peace()
+	_time_part("vassals", func(): _vassals_daily())
+	_time_part("legends", func(): _legends_daily())
 	_time_part("animals", func(): _animals_daily())
+	_time_part("monsters", func(): _monsters_daily())
 	_time_part("diplo", func(): _diplomacy_daily())
 	_time_part("roads", func(): _roads_tick())
 	_time_part("exp", func(): _expeditions_daily())
@@ -210,8 +240,8 @@ func _active_wars_count() -> int:
 
 
 func _world_daily() -> void:
-	# рост растительности — 1/12 карты в день
-	var offset := int(day) % 12
+	# рост растительности — 1/16 карты в день
+	var offset := int(day) % 16
 	var n := world.n()
 	var fert := world.fertility
 	var veg := world.vegetation
@@ -219,7 +249,7 @@ func _world_daily() -> void:
 	var moist := world.moisture
 	var temp := world.temperature
 	var winter := nuclear_winter > 0.0
-	for i in range(offset, n, 12):
+	for i in range(offset, n, 16):
 		if water[i] > 0.0004:
 			continue
 		var cap: float = float(fert[i]) * 1.05
@@ -228,7 +258,7 @@ func _world_daily() -> void:
 			var temp_f := 0.3 if temp[i] < 0.12 else 1.0
 			if winter:
 				temp_f *= 0.35
-			veg[i] = clampf(v + 0.008 * moist[i] * temp_f, 0.0, 1.0)
+			veg[i] = clampf(v + 0.011 * moist[i] * temp_f, 0.0, 1.0)
 	# тушение пожара дождём
 	if weather_mode == "rain" and burning.size() > 0:
 		var keys := burning.keys()
@@ -407,6 +437,9 @@ func _settlements_daily() -> void:
 		if s.blizzard > 0.0: s.blizzard = maxf(0.0, s.blizzard - 1.0)
 		if s.blessed > 0.0: s.blessed = maxf(0.0, s.blessed - 0.25)
 		if s.cursed > 0.0: s.cursed = maxf(0.0, s.cursed - 0.2)
+		s.zeal = clampf(s.zeal + s.building_count("temple") * 0.06 - 0.012, 0.0, 100.0)
+		if s.holy_war and s.wars.is_empty():
+			s.holy_war = false
 		if s.radioactive > 0.0: s.radioactive = maxf(0.0, s.radioactive - 0.002)
 		if s.war_days > 0: s.war_days += 1
 		# армия
@@ -420,6 +453,11 @@ func _settlements_daily() -> void:
 		_reproduction_tick(s, mods, local)
 		_siege_tick(s, local, groups)
 		_assign_targets(s, local)
+		if s.population < 12 and not s.wars.is_empty():
+			for eid in s.wars.duplicate():
+				var o: SettlementData = settlement_by_id.get(int(eid), null)
+				if o != null:
+					make_peace(s, o, true)
 		if s.population <= 0 and not s.destroyed:
 			_destroy_settlement(s, "empty")
 	for s in settlements:
@@ -619,6 +657,8 @@ func _advance_era(s: SettlementData) -> void:
 
 
 func _reproduction_tick(s: SettlementData, mods: Dictionary, local: Array) -> void:
+	if total_population >= 420:
+		return
 	if s.population >= s.max_pop():
 		return
 	if s.resources.get("food", 0.0) < 20.0:
@@ -628,7 +668,13 @@ func _reproduction_tick(s: SettlementData, mods: Dictionary, local: Array) -> vo
 	var housing_mod := clampf(float(s.housing()) / maxf(1.0, s.population / 2.0), 0.3, 1.2)
 	var food_mod := clampf(float(s.resources["food"]) / maxf(1.0, s.population), 0.5, 1.5)
 	var mood_mod := clampf(1.0 + s.happiness / 80.0, 0.5, 1.3)
-	var base := 0.00042 * float(mods.get("growth", 0.0) + 1.0) * food_mod * housing_mod * mood_mod * float(difficulty.get("growth", 1.0))
+	var base := 0.0025 * float(mods.get("growth", 0.0) + 1.0) * food_mod * housing_mod * mood_mod * float(difficulty.get("growth", 1.0))
+	if total_population < 40:
+		base *= 1.7
+	elif total_population > 340:
+		base *= 0.35
+	if s.population < 8:
+		base *= 1.6
 	var women: Array = []
 	for a in local:
 		if a.alive and a.gender == 1 and a.is_adult() and a.pregnant <= 0.0 and a.age < 48.0 and a.health > a.max_health * 0.4:
@@ -682,6 +728,21 @@ func _give_birth(mother: AgentData) -> void:
 			child.power = clampf((child.power + f.power) * 0.5, 5, 100)
 	mother.children.append(child.id)
 	s.total_births += 1
+	# династия и вера наследуются
+	child.dynasty = mother.dynasty
+	child.generation = mother.generation + 1
+	child.religion = mother.religion
+	child.parent_ids = [mother.id]
+	child.faith = mother.faith
+	if mother.father_id > 0:
+		child.parent_ids.append(mother.father_id)
+		var f0: AgentData = agent_by_id.get(mother.father_id, null)
+		if f0 != null:
+			child.faith = (child.faith + f0.faith) * 0.5
+	if s.leader_id == mother.id:
+		child.heir = true
+		mother.remember("birth", "Рождение наследника", child.id, child.pos, 3.0, year)
+		_add_event(s, "birth", "В %s родился наследник %s" % [s.name, child.display_name()], 3, "crown")
 	s.resources["food"] = maxf(0.0, float(s.resources["food"]) - 2.0)
 	mother.set_emotion("happy", "birth", 2.0)
 	child.bond_with(mother.id, 60.0)
@@ -714,9 +775,9 @@ func _siege_tick(s: SettlementData, local: Array, groups: Dictionary) -> void:
 				defenders.append(a)
 	if attackers.is_empty():
 		return
-	if defenders.is_empty() and s.war_days > 4:
+	if defenders.size() < maxi(2, attackers.size() / 5) and s.war_days > 5:
 		s.siege_days += 1
-		if s.siege_days >= 4:
+		if s.siege_days >= 3:
 			_sack_settlement(s, enemy)
 		return
 	var rounds := mini(18, attackers.size())
@@ -735,6 +796,9 @@ func _siege_tick(s: SettlementData, local: Array, groups: Dictionary) -> void:
 			if def.health <= 0.0:
 				att.kills += 1
 				att.add_xp(35.0)
+				att.add_deed(3.0)
+				if att.kills in [1, 5, 10, 25, 50]:
+					att.add_title("Ветеран войны")
 				kill_agent(def, "battle")
 				defenders.erase(def)
 				if att.level >= 8 and rng.randf() < 0.1:
@@ -758,20 +822,55 @@ func _sack_settlement(att: SettlementData, def: SettlementData) -> void:
 	var loot := def.resources.duplicate()
 	for k in ["food", "wood", "stone", "iron", "gold"]:
 		att.resources[k] = minf(att.storage_cap(), float(att.resources.get(k, 0.0)) + float(loot.get(k, 0.0)) * 0.5)
+	var conqueror: AgentData = agent_by_id.get(att.leader_id, null)
+	if conqueror != null:
+		conqueror.add_title("Завоеватель " + def.name)
+		conqueror.add_deed(20.0)
+		conqueror.remember("war", "Взял " + def.name, def.id, Vector2(def.center), 4.0, year)
 	def.resources = {"food": 0.0, "wood": 0.0, "stone": 0.0, "iron": 0.0, "gold": 0.0, "goods": 0.0}
 	# гибель части населения
 	var victims: Array = []
+	var survivors := 0
 	for a in agents:
 		if a.settlement_id == def.id and a.alive:
 			if rng.randf() < 0.35:
 				victims.append(a)
+			else:
+				survivors += 1
 	for a in victims:
 		kill_agent(a, "battle")
 	def.buildings.clear()
 	settlement_structure_changed.emit(def.id)
 	_add_event(def, "war", "%s разграблено армией %s" % [def.name, att.name], 4, "war")
-	_destroy_settlement(def, "sack")
+	# сильный победитель оставляет вассала, слабый — руины
+	if survivors >= 3 and att.population > def.population * 1.15 and rng.randf() < 0.65:
+		_vassalize(att, def)
+	else:
+		_destroy_settlement(def, "sack")
 	make_peace(att, def, true)
+
+
+func _vassalize(att: SettlementData, def: SettlementData) -> void:
+	if def.overlord_id >= 0:
+		var old: SettlementData = settlement_by_id.get(def.overlord_id, null)
+		if old != null:
+			old.vassals.erase(def.id)
+	def.overlord_id = att.id
+	if not att.vassals.has(def.id):
+		att.vassals.append(def.id)
+	def.holy_war = false
+	def.war_target = -1
+	def.relations[att.id] = -25.0
+	att.relations[def.id] = -15.0
+	def.happiness = maxf(-100.0, def.happiness - 20.0)
+	def.stability = maxf(5.0, def.stability - 25.0)
+	# наследник побеждённых становится заложником/вассалом
+	var ruler: AgentData = agent_by_id.get(def.leader_id, null)
+	if ruler != null:
+		ruler.add_title("Вассал " + att.name)
+	_add_event(att, "war", "%s становится вассалом %s" % [def.name, att.name], 4, "crown")
+	_add_event(def, "war", "%s признаёт власть %s" % [def.name, att.name], 4, "crown")
+	toast.emit("%s — вассал %s" % [def.name, att.name], "war")
 
 
 func _destroy_settlement(s: SettlementData, reason: String) -> void:
@@ -790,7 +889,7 @@ func _destroy_settlement(s: SettlementData, reason: String) -> void:
 		if other.id == s.id or other.destroyed:
 			continue
 		var d := Vector2(other.center).distance_to(Vector2(s.center))
-		if d < 55.0 and d < best_d:
+		if d < 90.0 and d < best_d:
 			best_d = d
 			refuge = other
 	var refugees: Array = []
@@ -811,13 +910,13 @@ func _destroy_settlement(s: SettlementData, reason: String) -> void:
 func _animals_daily() -> void:
 	var newborns: Array = []
 	var dead: Array = []
-	var parity := int(day) % 4
+	var parity := int(day) % 6
 	for an in animals:
 		if not an.alive:
 			continue
-		if int(an.id) % 4 != parity:
+		if int(an.id) % 6 != parity:
 			continue
-		an.age = float(an.age) + 4.0 / 365.0
+		an.age = float(an.age) + 6.0 / 365.0
 		var lifespan := 18.0
 		if an.age > lifespan or rng.randf() < 0.000024:
 			an.alive = false
@@ -833,12 +932,12 @@ func _animals_daily() -> void:
 					an.target = p
 					break
 		# размножение
-		if an.breed_cd <= 0.0 and rng.randf() < float(an.breed) * 0.42:
+		if an.breed_cd <= 0.0 and rng.randf() < float(an.breed) * 0.6:
 			an.breed_cd = 60.0
-			if animals.size() + newborns.size() < animals_cap:
+			if animals.size() + newborns.size() < animals_cap and newborns.size() < 3:
 				newborns.append(an.species)
 		else:
-			an.breed_cd = maxf(0.0, an.breed_cd - 1.0)
+			an.breed_cd = maxf(0.0, an.breed_cd - 1.5)
 		# хищники
 		if bool(an.predator) and rng.randf() < 0.03:
 			var victim: AgentData = _agent_near(an.pos, 1.6)
@@ -865,12 +964,167 @@ func _animals_daily() -> void:
 		animal_by_id.erase(an2.id)
 
 
+func _monsters_daily() -> void:
+	var dead: Array = []
+	for mv in monsters:
+		var m: Dictionary = mv
+		if not bool(m.get("alive", true)):
+			continue
+		m["age"] = float(m.get("age", 0.0)) + 1.0
+		if float(m.age) > 900.0 or (total_population < 25 and rng.randf() < 0.02):
+			m.alive = false
+			dead.append(m)
+			_add_world_event("monster", "%s уходит из этих земель" % str(m.get("name", "чудовище")), 2, "monster")
+			continue
+		var mp: Vector2 = m.pos
+		var target: SettlementData = null
+		var bd := 70.0
+		for sv in settlements:
+			var s: SettlementData = sv
+			if s.destroyed:
+				continue
+			var d := mp.distance_to(Vector2(s.center))
+			if d < bd:
+				bd = d
+				target = s
+		if target != null:
+			m.target = Vector2(target.center)
+			# монстр двигается и без камеры — сессия продолжается
+			var spd := float(m.get("speed", 1.0)) * 0.9
+			if mp.distance_to(Vector2(target.center)) > 3.0:
+				m.pos = mp.move_toward(Vector2(target.center), spd)
+			# атака поселения
+			if mp.distance_to(Vector2(target.center)) < float(target.territory_radius) + 1.0:
+				for a in agents:
+					if a.alive and a.settlement_id == target.id and a.pos.distance_to(mp) < 4.5 and rng.randf() < 0.07:
+						a.health -= float(m.get("power", 40)) * rng.randf_range(0.18, 0.45)
+						a.set_emotion("afraid", "monster", 20.0)
+						if a.health <= 0.0:
+							kill_agent(a, "monster")
+				if rng.randf() < 0.18 and not target.buildings.is_empty():
+					var bi := rng.randi() % target.buildings.size()
+					target.buildings[bi]["hp"] = float(target.buildings[bi].get("hp", 100)) - float(m.get("power", 40)) * 0.3
+					if float(target.buildings[bi].hp) <= 0.0:
+						target.buildings.remove_at(bi)
+						settlement_structure_changed.emit(target.id)
+				if rng.randf() < 0.12:
+					_ignite_cells(target.center.x, target.center.y, 3, 0.5)
+		# герои и стража бьют монстра
+		var hits := 0
+		for av in agents:
+			var a: AgentData = av
+			if hits >= 4:
+				break
+			if not a.alive or a.pos.distance_to(mp) > 4.0:
+				continue
+			if a.action != "fight" and a.role not in ["warrior", "leader"] and a.personality("aggression") < 55.0:
+				continue
+			hits += 1
+			var dmg: float = (a.attack_value() * rng.randf_range(0.25, 0.7) + a.level * 1.2)
+			m.hp = float(m.get("hp", 100.0)) - dmg
+			a.add_xp(3.0)
+			a.remember("fight", "Бой с " + str(m.get("name", "чудовищем")), int(m.id), mp, 2.0, year)
+			a.set_emotion("angry", "monster", 12.0)
+			effect.emit("battle", a.pos, 1.0, {})
+			# чудовище отвечает
+			if rng.randf() < 0.45:
+				a.health -= float(m.get("power", 40)) * rng.randf_range(0.35, 0.9)
+				if a.health <= 0.0:
+					kill_agent(a, "monster")
+					continue
+			if float(m.hp) <= 0.0:
+				m.alive = false
+				dead.append(m)
+				a.kills += 1
+				a.add_deed(12.0)
+				a.add_title("Убийца " + monster_name_acc(str(m.get("kind", "giant"))))
+				a.add_xp(90.0)
+				a.set_emotion("proud", "victory", 40.0)
+				a.notable = true
+				var s2: SettlementData = settlement_by_id.get(a.settlement_id, null)
+				if s2 != null:
+					s2.resources["food"] = minf(s2.storage_cap(), float(s2.resources.get("food", 0.0)) + 40.0)
+					s2.happiness = minf(100.0, s2.happiness + 18.0)
+					_add_event(s2, "monster", "%s побеждает %s" % [a.display_name(), monster_name_acc(str(m.get("kind", "giant")))], 4, "sword")
+				if a.favourite:
+					toast.emit("%s побеждает %s!" % [a.display_name(), monster_name_acc(str(m.get("kind", "giant")))], "power")
+				effect.emit("monster_death", mp, 2.0, {})
+				break
+			elif a.health <= 0.0:
+				kill_agent(a, "monster")
+	for m in dead:
+		monsters.erase(m)
+	# новые угрозы
+	if year >= 3 and total_population > 70 and _alive_settlement_count() >= 4 and monsters.size() < 2 and rng.randf() < 0.0018 * float(difficulty.get("disaster", 1.0)):
+		var kind: String = MONSTER_KINDS[rng.randi() % MONSTER_KINDS.size()]
+		var cell := _random_wild_cell()
+		if cell.x >= 0:
+			_spawn_monster(kind, cell)
+			_add_world_event("monster", "В мир приходит %s" % monster_name(kind), 4, "monster")
+
+
+func monster_name(kind: String) -> String:
+	match kind:
+		"dragon": return "дракон"
+		"undead": return "восставший легион"
+		"giant": return "горный великан"
+		"wyvern": return "виверна"
+	return "чудовище"
+
+
+func monster_name_acc(kind: String) -> String:
+	match kind:
+		"dragon": return "дракона"
+		"undead": return "восставший легион"
+		"giant": return "горного великана"
+		"wyvern": return "виверну"
+	return "чудовище"
+
+
+func _random_wild_cell() -> Vector2i:
+	for attempt in 40:
+		var x := rng.randi_range(6, world.size - 7)
+		var z := rng.randi_range(6, world.size - 7)
+		if not world.is_land_cell(x, z):
+			continue
+		var ok := true
+		for s in settlements:
+			if not s.destroyed and Vector2(s.center).distance_to(Vector2(x, z)) < 18.0:
+				ok = false
+				break
+		if ok:
+			return Vector2i(x, z)
+	return Vector2i(-1, -1)
+
+
+func _spawn_monster(kind: String, cell: Vector2i) -> Dictionary:
+	var stats := {
+		"dragon": {"hp": 1600.0, "power": 100.0, "speed": 1.4, "size": 2.6, "color": Color("#b83a2a")},
+		"undead": {"hp": 900.0, "power": 60.0, "speed": 0.9, "size": 1.8, "color": Color("#7aa87a")},
+		"giant": {"hp": 1200.0, "power": 80.0, "speed": 0.8, "size": 2.2, "color": Color("#8a6a4a")},
+		"wyvern": {"hp": 1000.0, "power": 70.0, "speed": 1.8, "size": 2.0, "color": Color("#6a5a8a")}
+	}
+	var st: Dictionary = stats.get(kind, stats["giant"])
+	var m: Dictionary = {
+		"id": next_monster_id, "kind": kind, "name": monster_name(kind),
+		"pos": Vector2(cell), "target": Vector2(cell), "hp": float(st.hp),
+		"max_hp": float(st.hp), "power": float(st.power), "speed": float(st.speed),
+		"size": float(st.size), "color": st.color, "alive": true, "age": 0.0
+	}
+	next_monster_id += 1
+	monsters.append(m)
+	effect.emit("monster_spawn", Vector2(cell), 3.0, {"kind": kind})
+	return m
+
+
 func _diplomacy_daily() -> void:
 	# раз в день — небольшая проверка, основные решения в _yearly
-	for s in settlements:
+	for sv in settlements:
+		var s: SettlementData = sv
 		if s.destroyed:
 			continue
-		for other in settlements:
+		for ov in settlements:
+			var other: SettlementData = ov
 			if other.id <= s.id or other.destroyed:
 				continue
 			var dist := Vector2(s.center).distance_to(Vector2(other.center))
@@ -878,6 +1132,20 @@ func _diplomacy_daily() -> void:
 				s.known[other.id] = true
 				other.known[s.id] = true
 			var rel := float(s.relations.get(other.id, 0.0))
+			var same_faith: bool = s.religion == other.religion
+			# вера сближает или разделяет
+			if same_faith:
+				rel += 0.012
+			else:
+				rel -= 0.018
+			# миссионерство: сильная вера переубеждает соседа
+			if same_faith and rel > 40.0 and s.zeal > 55.0 and rng.randf() < 0.00025:
+				other.religion = s.religion
+				other.zeal = clampf(other.zeal + 8.0, 0.0, 100.0)
+				for av in agents:
+					if av.alive and av.settlement_id == other.id and rng.randf() < 0.35:
+						av.religion = s.religion
+				_add_event(other, "faith", "%s принимает веру %s" % [other.name, religion_name(s.religion)], 2, "faith")
 			# торговля по дороге
 			var road: Dictionary = s.roads.get(other.id, {})
 			if not road.is_empty() and float(road.get("progress", 0.0)) >= 1.0:
@@ -896,6 +1164,10 @@ func _diplomacy_daily() -> void:
 			# война
 			if rel < -22.0 and rng.randf() < 0.00035 * float(difficulty.get("aggr", 1.0)) * (1.0 + maxf(0.0, -rel) / 100.0):
 				declare_war(s, other, "tension")
+			elif not same_faith and s.zeal > 68.0 and not s.wars.has(other.id) and rng.randf() < 0.00012 * (s.zeal / 100.0):
+				s.holy_war = true
+				declare_war(s, other, "faith")
+				_add_event(s, "faith", "%s объявляет священную войну против %s" % [s.name, other.name], 3, "faith")
 			elif rel > 55.0 and not s.allies.has(other.id) and rng.randf() < 0.00015:
 				s.allies.append(other.id)
 				other.allies.append(s.id)
@@ -1001,12 +1273,18 @@ func _expeditions_daily() -> void:
 						home.known[other.id] = true
 						other.known[home.id] = true
 						_add_event(home, "scout", "Экспедиция из %s достигла %s" % [home.name, other.name], 2, "eye")
+				# если место свободно — экспедиция основывает колонию
+				var near_settle: SettlementData = _settlement_near(Vector2i(target), 24.0)
+				if near_settle == null and home.population > 20 and _alive_settlement_count() < 18 and rng.randf() < 0.6:
+					if _found_colony_from_expedition(home, Vector2i(target), e.members):
+						done.append(e)
+						continue
 				e.phase = "return"
 				e.timer = 60.0
 				for mid in e.members:
 					var m2: AgentData = agent_by_id.get(int(mid), null)
 					if m2 != null and m2.alive:
-						m2.set_action("explore", Vector2(home.center), "return", 30.0)
+						m2.set_action("patrol", Vector2(home.center), "return", 30.0)
 						m2.carrying = ""
 		elif e.phase == "return":
 			var lead2: AgentData = agent_by_id.get(int(e.members[0]), null)
@@ -1016,14 +1294,14 @@ func _expeditions_daily() -> void:
 				for mid in e.members:
 					var m3: AgentData = agent_by_id.get(int(mid), null)
 					if m3 != null and m3.alive:
-						m3.action_time = m3.action_duration
+						m3.set_action("idle", Vector2(home.center), "returned", 1.0)
 						m3.set_emotion("proud", "expedition", 10.0)
 		elif float(e.timer) <= 0.0:
 			e.phase = "return"
 			for mid in e.members:
 				var m4: AgentData = agent_by_id.get(int(mid), null)
 				if m4 != null and m4.alive:
-					m4.set_action("explore", Vector2(home.center), "return", 40.0)
+					m4.set_action("patrol", Vector2(home.center), "return", 40.0)
 	for e in done:
 		expeditions.erase(e)
 	# запуск новой группы
@@ -1108,13 +1386,106 @@ func _fire_daily() -> void:
 
 
 func _radiation_daily() -> void:
-	var offset := int(day) % 24
+	var offset := int(day) % 32
 	var rad := world.radiation
 	var n := world.n()
-	for i in range(offset, n, 24):
+	for i in range(offset, n, 32):
 		var r := rad[i]
 		if r > 0.0:
-			rad[i] = maxf(0.0, r - 0.0005)
+			rad[i] = maxf(0.0, r - 0.0007)
+
+
+func _emergency_peace() -> void:
+	for sv in settlements:
+		var s: SettlementData = sv
+		if s.destroyed:
+			continue
+		for eid in s.wars.duplicate():
+			var o: SettlementData = settlement_by_id.get(int(eid), null)
+			if o != null:
+				make_peace(s, o, true)
+
+
+func _vassals_daily() -> void:	for sv in settlements:
+		var s: SettlementData = sv
+		if s.destroyed or s.overlord_id < 0:
+			continue
+		var ov: SettlementData = settlement_by_id.get(s.overlord_id, null)
+		if ov == null or ov.destroyed:
+			s.overlord_id = -1
+			continue
+		# дань
+		var tribute_gold: float = float(s.resources.get("gold", 0.0)) * s.tribute_rate * 0.06
+		var tribute_food: float = float(s.resources.get("food", 0.0)) * s.tribute_rate * 0.04
+		s.resources["gold"] = maxf(0.0, float(s.resources.get("gold", 0.0)) - tribute_gold)
+		s.resources["food"] = maxf(0.0, float(s.resources.get("food", 0.0)) - tribute_food)
+		ov.resources["gold"] = minf(ov.storage_cap(), float(ov.resources.get("gold", 0.0)) + tribute_gold)
+		ov.resources["food"] = minf(ov.storage_cap(), float(ov.resources.get("food", 0.0)) + tribute_food)
+		# вассал вступает в войны сюзерена
+		for eid in ov.wars:
+			if int(eid) != s.id and not s.wars.has(int(eid)):
+				s.wars.append(int(eid))
+				if s.war_target < 0:
+					s.war_target = int(eid)
+		# восстание
+		var rel := float(s.relations.get(ov.id, -20.0))
+		var loyalty: float = 55.0 + rel * 0.35 + float(ov.army - s.army) * 1.5 - s.zeal * 0.08
+		if (s.stability < 30.0 or loyalty < 18.0) and rng.randf() < 0.004:
+			s.overlord_id = -1
+			ov.vassals.erase(s.id)
+			if not s.wars.has(ov.id):
+				s.wars.append(ov.id)
+			s.war_target = ov.id
+			s.happiness = minf(100.0, s.happiness + 10.0)
+			_add_event(s, "war", "%s восстаёт против %s" % [s.name, ov.name], 3, "revolt")
+			_add_event(ov, "war", "%s восстаёт против %s" % [s.name, ov.name], 3, "revolt")
+			toast.emit("Восстание: %s против %s" % [s.name, ov.name], "war")
+
+
+func _legends_daily() -> void:
+	if int(day) % 3 != 0:
+		return
+	for av in agents:
+		var a: AgentData = av
+		if not a.alive:
+			continue
+		var sc := a.legend_score()
+		if sc > 140.0 and a.titles.size() < 3 and rng.randf() < 0.01:
+			if a.add_title("Легенда " + str(a.dynasty)):
+				var s: SettlementData = settlement_by_id.get(a.settlement_id, null)
+				if s != null:
+					_add_event(s, "legend", "Легенда: %s" % a.display_name(), 3, "star")
+				if a.favourite:
+					toast.emit("%s становится легендой" % a.display_name(), "crown")
+		elif sc > 55.0 and a.titles.is_empty() and rng.randf() < 0.004:
+			if a.add_title("Ветеран"):
+				if a.favourite:
+					toast.emit("%s получает титул «Ветеран»" % a.display_name(), "info")
+	# вражда внутри поселения
+	for sv in settlements:
+		var s: SettlementData = sv
+		if s.destroyed or s.population < 4:
+			continue
+		if rng.randf() > 0.02:
+			continue
+		var local: Array = []
+		for av2 in agents:
+			var a2: AgentData = av2
+			if a2.alive and a2.settlement_id == s.id:
+				local.append(a2)
+		if local.size() < 2:
+			continue
+		var x: AgentData = local[rng.randi() % local.size()]
+		var y: AgentData = local[rng.randi() % local.size()]
+		if x.id == y.id:
+			continue
+		if x.rival_id != y.id and float(x.bonds.get(y.id, 0.0)) < -25.0:
+			x.rival_id = y.id
+			y.rival_id = x.id
+			x.set_emotion("angry", "rival", 20.0)
+			y.set_emotion("angry", "rival", 20.0)
+			x.remember("feud", "Вражда с " + y.display_name(), y.id, y.pos, 2.0, year)
+			_add_event(s, "feud", "%s и %s стали врагами" % [x.display_name(), y.display_name()], 1, "sword")
 
 
 func _random_events_daily() -> void:
@@ -1171,10 +1542,10 @@ func _yearly() -> void:
 			if s.war_days > rng.randi_range(240, 900):
 				for other_id in s.wars.duplicate():
 					var o: SettlementData = settlement_by_id.get(other_id, null)
-					if o != null and rng.randf() < 0.3:
+					if o != null and rng.randf() < 0.5:
 						make_peace(s, o, false)
 		# объявление войны
-		if s.wars.is_empty() and s.army > 6 and rng.randf() < 0.012 * float(difficulty.get("aggr", 1.0)) * (1.0 + maxf(0.0, -s.happiness) / 100.0):
+		if s.wars.is_empty() and s.army > 6 and rng.randf() < 0.006 * float(difficulty.get("aggr", 1.0)) * (1.0 + maxf(0.0, -s.happiness) / 100.0):
 			var target := _nearest_other(s, 55.0)
 			if target != null and not s.allies.has(target.id):
 				declare_war(s, target, "ambition")
@@ -1239,6 +1610,9 @@ func _expand_colony(parent: SettlementData) -> void:
 	var s := SettlementData.new()
 	s.setup(next_settlement_id, parent.race_id, spot, year, rng)
 	s.name = _unique_name(s.name, s.id)
+	s.religion = parent.religion
+	s.zeal = parent.zeal
+	s.dynasty = parent.dynasty
 	next_settlement_id += 1
 	s.resources = parent.resources.duplicate()
 	for k in s.resources:
@@ -1261,9 +1635,71 @@ func _expand_colony(parent: SettlementData) -> void:
 		a.pos = Vector2(s.center) + Vector2(rng.randf_range(-2, 2), rng.randf_range(-2, 2))
 		a.target = a.pos
 	_assign_leader(s)
+	var ld2: AgentData = agent_by_id.get(s.leader_id, null)
+	if ld2 != null:
+		s.dynasty = ld2.dynasty
+		s.founded_by = ld2.id
 	_add_event(parent, "founded", "%s основало колонию %s" % [parent.name, s.name], 3, "people")
 	toast.emit(L.tf("toast_city", [s.name]), "city")
 	settlement_founded.emit(s)
+
+
+func _found_colony_from_expedition(home: SettlementData, cell: Vector2i, members: Array) -> bool:
+	if not world.is_land_cell(cell.x, cell.y):
+		return false
+	var h0 := world.heights[world.idx(cell.x, cell.y)]
+	var flat := true
+	for dz in range(-2, 3):
+		for dx in range(-2, 3):
+			var hh := world.heights[world.idx(clampi(cell.x + dx, 0, world.size - 1), clampi(cell.y + dz, 0, world.size - 1))]
+			if absf(hh - h0) > 0.05:
+				flat = false
+				break
+		if not flat:
+			break
+	if not flat:
+		return false
+	var s := SettlementData.new()
+	s.setup(next_settlement_id, home.race_id, cell, year, rng)
+	s.name = _unique_name(s.name, s.id)
+	next_settlement_id += 1
+	s.resources = {"food": 60.0, "wood": 40.0, "stone": 15.0, "iron": 0.0, "gold": 5.0, "goods": 0.0}
+	s.religion = home.religion
+	s.zeal = home.zeal
+	s.known[home.id] = true
+	home.known[s.id] = true
+	s.relations[home.id] = 70.0
+	home.relations[s.id] = 70.0
+	s.dynasty = home.dynasty
+	settlements.append(s)
+	settlement_by_id[s.id] = s
+	world.add_clearing(s.center, 8.0)
+	s.add_building("campfire", s.center.x, s.center.y, rng.randf() * TAU, year)
+	var settlers := 0
+	for mid in members:
+		var a: AgentData = agent_by_id.get(int(mid), null)
+		if a == null or not a.alive:
+			continue
+		a.settlement_id = s.id
+		a.pos = Vector2(s.center) + Vector2(rng.randf_range(-2, 2), rng.randf_range(-2, 2))
+		a.target = a.pos
+		a.home_pos = a.pos
+		a.set_action("work", a.pos, "settled", 5.0)
+		a.carrying = ""
+		a.set_emotion("proud", "settled", 30.0)
+		a.remember("colony", "Основал " + s.name, s.id, a.pos, 5.0, year)
+		a.add_title("Первопроходец " + s.name)
+		settlers += 1
+	_assign_leader(s)
+	var ld3: AgentData = agent_by_id.get(s.leader_id, null)
+	if ld3 != null:
+		s.dynasty = ld3.dynasty
+		s.founded_by = ld3.id
+	_add_event(home, "founded", "Экспедиция из %s основала %s" % [home.name, s.name], 3, "flag")
+	_add_event(s, "founded", "%s основано первопроходцами из %s" % [s.name, home.name], 3, "people")
+	toast.emit("Новая колония: %s" % s.name, "city")
+	settlement_founded.emit(s)
+	return true
 
 
 func _find_colony_spot(parent: SettlementData) -> Vector2i:
@@ -1275,6 +1711,18 @@ func _find_colony_spot(parent: SettlementData) -> Vector2i:
 		if c.x < 5 or c.y < 5 or c.x >= world.size - 5 or c.y >= world.size - 5:
 			continue
 		if not world.is_land_cell(c.x, c.y):
+			continue
+		var h0 := world.heights[world.idx(c.x, c.y)]
+		var flat := true
+		for dz in range(-2, 3):
+			for dx in range(-2, 3):
+				var hh := world.heights[world.idx(clampi(c.x + dx, 0, world.size - 1), clampi(c.y + dz, 0, world.size - 1))]
+				if absf(hh - h0) > 0.05:
+					flat = false
+					break
+			if not flat:
+				break
+		if not flat:
 			continue
 		var b := world.biome_name_at(c.x, c.y)
 		if b in ["ocean", "shallow", "reef", "river", "lake", "swamp", "snow", "glacier", "volcano", "ashland"]:
@@ -1328,6 +1776,8 @@ func spawn_agent(s: SettlementData, age: float, gender: int, role: String, pos: 
 	a.setup(next_agent_id, D.race(race_id), gender, age, rng)
 	next_agent_id += 1
 	a.settlement_id = s.id if s != null else -1
+	a.religion = s.religion if s != null else str(RELIGIONS[rng.randi() % RELIGIONS.size()].id)
+	a.faith = rng.randf_range(35.0, 75.0)
 	a.role = role if role != "worker" else a.role
 	a.pos = pos
 	a.target = pos
@@ -1428,6 +1878,11 @@ func kill_agent(a: AgentData, cause: String) -> void:
 				if other.alive and other.settlement_id == s.id and other.pos.distance_to(a.pos) < 9.0:
 					other.set_emotion("afraid", cause, 20.0)
 					other.bond_with(a.id, -6.0)
+					other.remember("death", "Смерть " + a.display_name(), a.id, a.pos, 1.0, year)
+		if a.favourite:
+			toast.emit("Ваш избранник %s погиб (%s)" % [a.display_name(), L.t("cause_" + cause)], "death")
+		if a.legend_score() > 70.0:
+			_add_world_event("legend", "Легенда угасла: %s" % a.display_name(), 3, "skull")
 	if a.partner_id > 0:
 		var p: AgentData = agent_by_id.get(a.partner_id, null)
 		if p != null:
@@ -1435,8 +1890,8 @@ func kill_agent(a: AgentData, cause: String) -> void:
 
 
 func _assign_targets(s: SettlementData, local: Array) -> void:
-	# решения принимаются раз в 2 дня на поселение — так поведение стабильнее и дешевле
-	if int(day) % 2 != s.id % 2:
+	# решения принимаются раз в 3 дня на поселение — так поведение стабильнее и дешевле
+	if int(day) % 3 != s.id % 3:
 		return
 	var center := Vector2(s.center)
 	var enemy: SettlementData = settlement_by_id.get(s.war_target, null) if s.war_target >= 0 else null
@@ -1457,14 +1912,16 @@ func _assign_targets(s: SettlementData, local: Array) -> void:
 	var builder_ids: Dictionary = {}
 	if has_site:
 		var cand: Array = []
-		for a0 in local:
+		for a0v in local:
+			var a0: AgentData = a0v
 			if a0.alive and a0.is_adult() and a0.role not in ["leader", "warrior", "child"]:
 				cand.append(a0)
 		cand.sort_custom(func(x, y): return float(x.skills.get("craft", 0)) > float(y.skills.get("craft", 0)))
 		for i in mini(3, cand.size()):
 			builder_ids[cand[i].id] = true
 			cand[i].role = "builder"
-	for a in local:
+	for av in local:
+		var a: AgentData = av
 		if not a.alive:
 			continue
 		if a.action == "explore":
@@ -1503,8 +1960,15 @@ func _assign_targets(s: SettlementData, local: Array) -> void:
 			a.action_progress = float(s.construction.get("progress", 0.0)) / maxf(1.0, float(s.construction.get("days", 8.0)))
 			continue
 		if a.role == "child":
-			var ct := center + Vector2(rng.randf_range(-3.0, 3.0), rng.randf_range(-3.0, 3.0))
-			a.set_action("play", ct, "child", rng.randf_range(2.0, 4.0))
+			if a.age >= 12.0:
+				var b3: Dictionary = s.buildings[rng.randi() % maxi(1, s.buildings.size())] if not s.buildings.is_empty() else {}
+				var wt3 := center + Vector2(rng.randf_range(-3, 3), rng.randf_range(-3, 3))
+				if not b3.is_empty():
+					wt3 = Vector2(float(b3.x), float(b3.z)) + Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1))
+				a.set_action("work", wt3, "help", 3.0)
+			else:
+				var ct := center + Vector2(rng.randf_range(-3.0, 3.0), rng.randf_range(-3.0, 3.0))
+				a.set_action("play", ct, "child", rng.randf_range(2.0, 4.0))
 			continue
 		if a.role == "leader":
 			if has_site and rng.randf() < 0.6:
@@ -1526,9 +1990,23 @@ func _assign_targets(s: SettlementData, local: Array) -> void:
 			u_hunt = 0.72 + maxf(0.0, 1.1 - clampf(food_ratio, 0.0, 1.5)) * 0.9
 		elif float(a.skills.get("survival", 0)) > 42.0 and food_ratio < 1.0:
 			u_hunt = (1.05 - clampf(food_ratio, 0.0, 1.0)) * 1.1
-		var u_work := 0.5 + float(a.skills.get("craft", 0)) / 320.0
-		var u_social := clampf((18.0 - a.mood) / 36.0, 0.0, 1.0) * 0.55
-		var u_pray := clampf(maxf(0.0, -s.happiness) / 60.0, 0.0, 1.0) * 0.5
+		u_hunt += a.personality("aggression") / 320.0
+		var u_work: float = 0.5 + float(a.skills.get("craft", 0)) / 320.0 + a.personality("ambition") / 360.0
+		var u_social: float = clampf((18.0 - a.mood) / 36.0, 0.0, 1.0) * 0.55 + a.personality("sociability") / 340.0
+		var u_pray: float = clampf(maxf(0.0, -s.happiness) / 60.0, 0.0, 1.0) * 0.5 + a.personality("piety") / 360.0
+		var u_patrol: float = a.personality("curiosity") / 420.0
+		var monster: Dictionary = _nearest_monster(a.pos, 16.0)
+		var u_fight := 0.0
+		var u_flee := 0.0
+		if not monster.is_empty():
+			u_fight = 0.8 + a.personality("aggression") / 180.0
+			if a.role == "warrior" or a.role == "leader":
+				u_fight += 0.5
+			if a.personality("loyalty") > 65.0:
+				u_fight += 0.3
+			if a.personality("aggression") < 50.0 or a.health < a.max_health * 0.5:
+				u_flee = 1.0
+				u_fight *= 0.4
 		var best := "work"
 		var best_u := u_work
 		if u_sleep > best_u: best = "sleep"; best_u = u_sleep
@@ -1538,6 +2016,9 @@ func _assign_targets(s: SettlementData, local: Array) -> void:
 		if u_hunt > best_u: best = "hunt"; best_u = u_hunt
 		if u_social > best_u: best = "socialize"; best_u = u_social
 		if u_pray > best_u: best = "pray"; best_u = u_pray
+		if u_fight > best_u: best = "fight"; best_u = u_fight
+		if u_flee > best_u: best = "flee"; best_u = u_flee
+		if u_patrol > best_u: best = "patrol"; best_u = u_patrol
 		match best:
 			"sleep":
 				var st := center
@@ -1570,9 +2051,17 @@ func _assign_targets(s: SettlementData, local: Array) -> void:
 				var st2 := center + Vector2(rng.randf_range(-2, 2), rng.randf_range(-2, 2))
 				if friend != null:
 					st2 = friend.pos
-					a.bond_with(friend.id, 1.5)
-					friend.bond_with(a.id, 1.5)
-					a.set_emotion("happy", "friends", 8.0)
+					var same_faith2: bool = a.religion == friend.religion
+					var delta: float = 1.5 * (0.5 + a.personality("sociability") / 100.0)
+					if friend.rival_id == a.id or not same_faith2:
+						delta = -2.2
+						a.set_emotion("angry", "rival", 10.0)
+						friend.set_emotion("angry", "rival", 10.0)
+					a.bond_with(friend.id, delta)
+					friend.bond_with(a.id, delta)
+					if delta > 0.0:
+						a.set_emotion("happy", "friends", 8.0)
+						a.remember("social", "Разговор с " + friend.display_name(), friend.id, friend.pos, 0.5, year)
 				a.set_action("socialize", st2, "social", 3.0)
 			"pray":
 				var temple := _building_of_type(s, "temple")
@@ -1580,6 +2069,19 @@ func _assign_targets(s: SettlementData, local: Array) -> void:
 				if not temple.is_empty():
 					pt = Vector2(temple.x, temple.z)
 				a.set_action("pray", pt, "faith", 2.0)
+			"fight":
+				a.hunting_id = int(monster.id)
+				a.set_action("fight", Vector2(monster.pos), "monster", 4.0)
+				a.set_emotion("angry", "monster", 10.0)
+			"flee":
+				var away2 := a.pos - Vector2(monster.pos)
+				if away2.length() < 0.1:
+					away2 = Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1))
+				a.set_action("flee", a.pos + away2.normalized() * 9.0, "fear", 3.0)
+				a.set_emotion("afraid", "monster", 15.0)
+			"patrol":
+				var pang := rng.randf() * TAU
+				a.set_action("patrol", center + Vector2(cos(pang), sin(pang)) * radius, "curiosity", 5.0)
 			_:
 				if not s.buildings.is_empty():
 					var b: Dictionary = s.buildings[rng.randi() % s.buildings.size()]
@@ -1618,6 +2120,19 @@ func _nearest_animal(p: Vector2, max_dist: float) -> Dictionary:
 		if d < bd:
 			bd = d
 			best = an
+	return best
+
+
+func _nearest_monster(p: Vector2, max_dist: float) -> Dictionary:
+	var best: Dictionary = {}
+	var bd := max_dist
+	for m in monsters:
+		if not bool(m.get("alive", true)):
+			continue
+		var d: float = Vector2(m.pos).distance_to(p)
+		if d < bd:
+			bd = d
+			best = m
 	return best
 
 
@@ -1747,6 +2262,9 @@ func spawn_agent_custom(cell: Vector2i, race_id: String, gender: int, age: float
 	next_agent_id += 1
 	a.race_id = race_id
 	a.settlement_id = settlement_id
+	a.religion = s.religion if s != null else str(RELIGIONS[rng.randi() % RELIGIONS.size()].id)
+	a.faith = rng.randf_range(35.0, 80.0)
+	a.dynasty = a.family
 	a.role = "worker" if age >= 18 else "child"
 	a.pos = pos
 	a.target = pos
@@ -1799,20 +2317,34 @@ func _nearest_water_cell(cell: Vector2i, max_r: int) -> Vector2i:
 
 
 func _assign_leader(s: SettlementData) -> void:
+	var prev_id := s.leader_id
 	var best: AgentData = null
 	var best_score := -1.0
 	for a in agents:
 		if a.settlement_id == s.id and a.alive and a.is_adult():
-			var score: float = a.charisma + float(a.skills.get("leadership", 20)) + a.level * 2.0
+			var score: float = a.charisma + float(a.skills.get("leadership", 20)) + a.level * 2.0 + a.legend_score() * 0.15
+			if a.heir:
+				score += 55.0
+			if a.parent_ids.has(prev_id):
+				score += 45.0
+			if not s.dynasty.is_empty() and a.dynasty == s.dynasty:
+				score += 25.0
 			if score > best_score:
 				best_score = score
 				best = a
 	if best != null:
+		for a in agents:
+			if a.settlement_id == s.id and a.alive:
+				a.heir = false
 		s.leader_id = best.id
+		s.dynasty = best.dynasty
 		best.role = "leader"
 		best.notable = true
-		if rng.randf() < 0.6:
-			_add_event(s, "leader", L.tf("new_leader", [best.display_name(), s.name]), 1, "crown")
+		best.add_title("Правитель " + s.name)
+		best.remember("leader", "Избран правителем " + s.name, s.id, best.pos, 3.0, year)
+		_add_event(s, "leader", L.tf("new_leader", [best.display_name(), s.name]), 1, "crown")
+		if best.favourite:
+			toast.emit("%s избран правителем %s" % [best.display_name(), s.name], "crown")
 
 
 func _agent_near(p: Vector2, radius: float) -> AgentData:
@@ -2210,6 +2742,9 @@ func spawn_tribe(cx: int, cz: int) -> SettlementData:
 	var s := SettlementData.new()
 	s.setup(next_settlement_id, race, cell, year, rng)
 	s.name = _unique_name(s.name, s.id)
+	var rel: Dictionary = RELIGIONS[rng.randi() % RELIGIONS.size()]
+	s.religion = str(rel.id)
+	s.zeal = rng.randf_range(30.0, 70.0)
 	next_settlement_id += 1
 	s.add_building("hut", s.center.x + 1.2, s.center.y + 0.5, rng.randf() * TAU, year)
 	s.add_building("farm", s.center.x - 1.3, s.center.y + 1.2, rng.randf() * TAU, year)
@@ -2226,6 +2761,10 @@ func spawn_tribe(cx: int, cz: int) -> SettlementData:
 			s.relations[other.id] = rng.randi_range(-5, 15)
 			other.relations[s.id] = s.relations[other.id]
 	_assign_leader(s)
+	var ld: AgentData = agent_by_id.get(s.leader_id, null)
+	if ld != null:
+		s.dynasty = ld.dynasty
+		s.founded_by = ld.id
 	_add_event(s, "founded", L.tf("city_founded", [s.name]), 2, "people")
 	toast.emit(L.tf("toast_city", [s.name]), "city")
 	settlement_founded.emit(s)
@@ -2296,14 +2835,28 @@ func prophet(s: SettlementData) -> void:
 		return
 	s.faith = minf(200.0, s.faith + 40.0)
 	s.happiness += 15.0
+	if rng.randf() < 0.45:
+		var rel: Dictionary = RELIGIONS[rng.randi() % RELIGIONS.size()]
+		s.religion = str(rel.id)
+	s.zeal = 100.0
 	var p := spawn_agent(s, rng.randf_range(25, 40), rng.randi() % 2, "worker", Vector2(s.center))
 	p.magic = minf(100.0, p.magic + 40.0)
 	p.charisma = minf(100.0, p.charisma + 30.0)
 	p.wisdom = minf(100.0, p.wisdom + 20.0)
 	p.notable = true
+	p.religion = s.religion
+	p.faith = 100.0
 	p.role = "leader"
+	p.add_title("Пророк " + religion_name(s.religion))
+	p.remember("faith", "Основал веру " + religion_name(s.religion), s.id, p.pos, 5.0, year)
 	s.leader_id = p.id
+	s.dynasty = p.dynasty
+	for a in agents:
+		if a.alive and a.settlement_id == s.id:
+			a.religion = s.religion
+			a.faith = maxf(a.faith, 70.0)
 	_add_event(s, "prophet", L.tf("prophet", [s.name]), 3, "prophet")
+	_add_event(s, "faith", "%s: новая эра веры — %s" % [s.name, religion_name(s.religion)], 3, "faith")
 	toast.emit(L.tf("toast_prophet", [s.name]), "prophet")
 	effect.emit("prophet", Vector2(s.center), 7.0, {})
 
@@ -2358,6 +2911,30 @@ func _add_world_event(type: String, text: String, importance: int = 1, icon: Str
 	chronicle_added.emit(chronicle.events.back())
 
 
+func religion_info(id: String) -> Dictionary:
+	for r in RELIGIONS:
+		if str(r.id) == id:
+			return r
+	return {"id": id, "name": id, "color": "#c8c8c8"}
+
+
+func religion_name(id: String) -> String:
+	return str(religion_info(id).get("name", id))
+
+
+func religion_color(id: String) -> Color:
+	return Color(str(religion_info(id).get("color", "#c8c8c8")))
+
+
+func top_legends(count: int = 8) -> Array:
+	var arr: Array = []
+	for a in agents:
+		if a.alive and a.legend_score() > 8.0:
+			arr.append(a)
+	arr.sort_custom(func(x, y): return x.legend_score() > y.legend_score())
+	return arr.slice(0, count)
+
+
 func selected_agent() -> AgentData:
 	return null
 
@@ -2386,6 +2963,14 @@ func to_dict() -> Dictionary:
 	var st: Array = []
 	for s in settlements:
 		st.append(s.to_dict())
+	var mo: Array = []
+	for m in monsters:
+		mo.append({
+			"id": int(m.id), "kind": str(m.kind), "name": str(m.name),
+			"pos": [m.pos.x, m.pos.y], "target": [m.target.x, m.target.y],
+			"hp": float(m.hp), "max_hp": float(m.max_hp), "power": float(m.power),
+			"speed": float(m.speed), "size": float(m.size), "alive": bool(m.alive), "age": float(m.get("age", 0.0))
+		})
 	return {
 		"day": day, "year": year, "season": season, "total_population": total_population,
 		"next_agent_id": next_agent_id, "next_settlement_id": next_settlement_id,
@@ -2393,7 +2978,7 @@ func to_dict() -> Dictionary:
 		"settlements": st, "chronicle": chronicle.to_dict(),
 		"weather": weather_mode, "weather_days_left": weather_days_left, "nuclear_winter": nuclear_winter,
 		"nukes_total": nukes_total, "world_age_years": world_age_years,
-		"burning": burning.keys()
+		"burning": burning.keys(), "monsters": mo, "next_monster_id": next_monster_id
 	}
 
 
@@ -2435,11 +3020,34 @@ func from_dict(d: Dictionary) -> void:
 	settlements.clear(); settlement_by_id.clear()
 	for sd in d.get("settlements", []):
 		var s := SettlementData.from_dict(sd)
+		if s.religion.is_empty():
+			s.religion = str(RELIGIONS[rng.randi() % RELIGIONS.size()].id)
 		settlements.append(s)
 		settlement_by_id[s.id] = s
 		if not s.destroyed:
 			world.add_clearing(s.center, 9.0)
+	for a in agents:
+		if a.religion.is_empty():
+			var sa: SettlementData = settlement_by_id.get(a.settlement_id, null)
+			a.religion = sa.religion if sa != null else str(RELIGIONS[rng.randi() % RELIGIONS.size()].id)
+		if a.dynasty.is_empty():
+			a.dynasty = a.family
 	chronicle = ChronicleData.from_dict(d.get("chronicle", {}))
+	monsters.clear()
+	for md in d.get("monsters", []):
+		var mp: Array = md.get("pos", [0, 0])
+		var mt: Array = md.get("target", [0, 0])
+		monsters.append({
+			"id": int(md.get("id", 0)), "kind": str(md.get("kind", "giant")),
+			"name": str(md.get("name", "чудовище")),
+			"pos": Vector2(float(mp[0]), float(mp[1])),
+			"target": Vector2(float(mt[0]), float(mt[1])),
+			"hp": float(md.get("hp", 100)), "max_hp": float(md.get("max_hp", 100)),
+			"power": float(md.get("power", 40)), "speed": float(md.get("speed", 1.0)),
+			"size": float(md.get("size", 2.0)), "alive": bool(md.get("alive", true)),
+			"age": float(md.get("age", 0.0))
+		})
+	next_monster_id = int(d.get("next_monster_id", monsters.size() + 1))
 	burning.clear()
 	for k in d.get("burning", []):
 		burning[int(k)] = world.burn[int(k)] if int(k) < world.n() else 0.0

@@ -352,7 +352,8 @@ func _process(delta: float) -> void:
 			else:
 				var war_mark := " ⚔" if not s.wars.is_empty() else ""
 				lbl.text = "%s%s · %s" % [s.name, war_mark, L.num(s.population)]
-				lbl.modulate = Color(1, 0.88, 0.7) if not s.wars.is_empty() else (Color(1, 0.9, 0.5) if s.id == selected_id else Color(1, 1, 1))
+				var faith_col := sim.religion_color(s.religion).lerp(Color.WHITE, 0.55)
+				lbl.modulate = Color(1, 0.88, 0.7) if not s.wars.is_empty() else (Color(1, 0.9, 0.5) if s.id == selected_id else faith_col)
 			# декластеризация подписей
 			var wp: Vector3 = data.root.global_position + Vector3(0, 6.0, 0)
 			if camera_rig != null and camera_rig.camera != null:
