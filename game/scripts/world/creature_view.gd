@@ -13,6 +13,11 @@ var agent_slot: Dictionary = {}        # id -> [variant, instance]
 var agent_colors: Dictionary = {}      # id -> Color
 var animal_mm: MultiMeshInstance3D
 var animal_index: Dictionary = {}
+var monster_nodes: Dictionary = {}
+var focus_cell := Vector2(-1, -1)
+var lod_radius := 120.0
+var lod_timer := 0.0
+var last_lod_focus := Vector2(-1, -1)
 var emotion_mm: MultiMeshInstance3D
 var emotion_slot: Dictionary = {}
 var carry_mm: MultiMeshInstance3D
@@ -149,6 +154,11 @@ func setup(p_world: WorldModel, p_sim: SimWorld) -> void:
 func _process(delta: float) -> void:
 	if sim == null:
 		return
+	lod_timer -= delta
+	if focus_cell.x >= 0.0 and (last_lod_focus.x < 0.0 or focus_cell.distance_to(last_lod_focus) > 8.0) and lod_timer <= 0.0:
+		lod_timer = 0.5
+		last_lod_focus = focus_cell
+		slots_dirty = true
 	if skip_sync:
 		last_sync_us = 0
 		_update_selection(delta)
@@ -159,6 +169,7 @@ func _process(delta: float) -> void:
 		rebuild_slots()
 	_sync_agents(delta)
 	_sync_animals()
+	_sync_monsters()
 	last_sync_us = Time.get_ticks_usec() - t0
 	_update_selection(delta)
 
@@ -170,17 +181,24 @@ func rebuild_slots() -> void:
 	var counts := PackedInt32Array()
 	counts.resize(VARIANTS)
 	counts.fill(0)
+	var lod := focus_cell.x >= 0.0
 	for av in sim.agents:
 		var a: AgentData = av
+		if lod and a.pos.distance_to(focus_cell) > lod_radius:
+			continue
 		var v := clampi(int(a.appearance.get("variant", a.id % VARIANTS)), 0, VARIANTS - 1)
 		counts[v] += 1
 	for v in VARIANTS:
 		agent_mms[v].multimesh.instance_count = counts[v]
+		for i in counts[v]:
+			agent_mms[v].multimesh.set_instance_transform(i, Transform3D(Basis.from_scale(Vector3.ONE * 0.001), Vector3.ZERO))
 	var used := PackedInt32Array()
 	used.resize(VARIANTS)
 	used.fill(0)
 	for av in sim.agents:
 		var a: AgentData = av
+		if lod and a.pos.distance_to(focus_cell) > lod_radius:
+			continue
 		var v := clampi(int(a.appearance.get("variant", a.id % VARIANTS)), 0, VARIANTS - 1)
 		var idx := used[v]
 		used[v] += 1
@@ -190,19 +208,30 @@ func rebuild_slots() -> void:
 		agent_mms[v].multimesh.set_instance_color(idx, col)
 
 	emotion_slot.clear()
-	emotion_mm.multimesh.instance_count = sim.agents.size()
+	var visible: Array = []
+	for av in sim.agents:
+		var a: AgentData = av
+		if lod and a.pos.distance_to(focus_cell) > lod_radius:
+			continue
+		visible.append(a)
+	emotion_mm.multimesh.instance_count = visible.size()
 	carry_slot.clear()
-	carry_mm.multimesh.instance_count = sim.agents.size()
-	for i in sim.agents.size():
-		var id: int = sim.agents[i].id
+	carry_mm.multimesh.instance_count = visible.size()
+	for i in visible.size():
+		var id: int = visible[i].id
 		emotion_slot[id] = i
 		carry_slot[id] = i
 
 	animal_index.clear()
 	var amm := animal_mm.multimesh
-	amm.instance_count = sim.animals.size()
-	for i in sim.animals.size():
-		var an: Dictionary = sim.animals[i]
+	var animal_visible: Array = []
+	for an in sim.animals:
+		if lod and Vector2(an.pos).distance_to(focus_cell) > lod_radius * 1.2:
+			continue
+		animal_visible.append(an)
+	amm.instance_count = animal_visible.size()
+	for i in animal_visible.size():
+		var an: Dictionary = animal_visible[i]
 		animal_index[int(an.id)] = i
 		var sp: Dictionary = D.animal(str(an.species))
 		amm.set_instance_color(i, sp.get("color_c", Color.WHITE))
@@ -239,8 +268,7 @@ func _sync_agents(delta: float) -> void:
 		var a: AgentData = av
 		var slot: Array = agent_slot.get(a.id, [])
 		if slot.is_empty():
-			slots_dirty = true
-			return
+			continue
 		var p := a.pos
 		var wp := Vector3((p.x - half) * WorldModel.CELL, 0, (p.y - half) * WorldModel.CELL)
 		var wx := world.world_to_cell(wp)
@@ -332,12 +360,11 @@ func _sync_animals() -> void:
 	if sim.animals.is_empty():
 		return
 	var mm := animal_mm.multimesh
-	if mm.instance_count != sim.animals.size():
-		slots_dirty = true
-		return
 	var half := world.size * 0.5
-	for i in sim.animals.size():
-		var an: Dictionary = sim.animals[i]
+	for an in sim.animals:
+		var idx: int = animal_index.get(int(an.id), -1)
+		if idx < 0:
+			continue
 		var p: Vector2 = an.pos
 		var sp: Dictionary = D.animal(str(an.species))
 		var wp := Vector3((p.x - half) * WorldModel.CELL, 0, (p.y - half) * WorldModel.CELL)
@@ -352,7 +379,42 @@ func _sync_animals() -> void:
 		var size := float(sp.get("size", 0.7))
 		var sc := (0.7 + size * 0.55) * 1.35
 		var basis := Basis(Vector3.UP, ang).scaled(Vector3(sc, sc, sc))
-		mm.set_instance_transform(i, Transform3D(basis, wp))
+		mm.set_instance_transform(idx, Transform3D(basis, wp))
+
+
+func _sync_monsters() -> void:
+	var alive_ids: Dictionary = {}
+	for m in sim.monsters:
+		if not bool(m.get("alive", true)):
+			continue
+		var id := int(m.id)
+		alive_ids[id] = true
+		var node: MeshInstance3D = monster_nodes.get(id, null)
+		if node == null:
+			node = MeshInstance3D.new()
+			node.name = "Monster_%d" % id
+			node.mesh = MeshKit.monster_mesh(str(m.get("kind", "giant")))
+			node.material_override = MeshKit.vertex_material()
+			node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+			add_child(node)
+			monster_nodes[id] = node
+		var p: Vector2 = m.pos
+		var half := world.size * 0.5
+		var wx := world.world_to_cell(Vector3((p.x - half) * WorldModel.CELL, 0, (p.y - half) * WorldModel.CELL))
+		var wy := world.terrain_y(wx.x, wx.y)
+		var t: Vector2 = m.target
+		var ang := atan2(t.x - p.x, t.y - p.y)
+		var size := float(m.get("size", 2.0))
+		var bob := sin(anim_time * 2.4 + float(id)) * 0.25
+		node.position = Vector3((p.x - half) * WorldModel.CELL, wy + bob, (p.y - half) * WorldModel.CELL)
+		node.rotation = Vector3(0, ang, 0)
+		node.scale = Vector3.ONE * size
+	for id in monster_nodes.keys():
+		if not alive_ids.has(id):
+			var n: MeshInstance3D = monster_nodes[id]
+			if is_instance_valid(n):
+				n.queue_free()
+			monster_nodes.erase(id)
 
 
 func _update_selection(delta: float) -> void:
@@ -389,6 +451,10 @@ func _update_selection(delta: float) -> void:
 func set_selected(id: int) -> void:
 	selected_id = id
 	label_timer = 0.0
+
+
+func set_focus(p: Vector2) -> void:
+	focus_cell = p
 
 
 func _on_effect(kind: String, pos: Vector2, _radius: float, _data: Dictionary) -> void:
