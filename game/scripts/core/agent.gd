@@ -2,6 +2,8 @@ class_name AgentData
 extends RefCounted
 ## Одно разумное существо. Данные, без ссылок на сцену.
 
+const ALL_PERKS := ["tough", "industrious", "genius", "charmer", "swift", "lucky", "brave", "curious", "frugal", "pious"]
+
 var id: int = 0
 var race_id: String = "human"
 var name: String = ""
@@ -75,6 +77,7 @@ var rival_id: int = -1
 var religion: String = ""
 var faith: float = 50.0
 var heir: bool = false
+var inventory: Dictionary = {}
 
 
 func setup(p_id: int, p_race: Dictionary, p_gender: int, p_age: float, rng: RandomNumberGenerator) -> void:
@@ -168,6 +171,11 @@ func setup(p_id: int, p_race: Dictionary, p_gender: int, p_age: float, rng: Rand
 			traits["aggression"] += 10
 	for k in traits:
 		traits[k] = clampi(int(traits[k]), 5, 100)
+	inventory = {"food": rng.randi_range(1, 3)}
+	if role == "hunter":
+		inventory["spear"] = 1
+	elif role == "builder":
+		inventory["hammer"] = 1
 	dynasty = family if not family.is_empty() else name
 	home_pos = pos
 
@@ -349,7 +357,7 @@ func to_dict() -> Dictionary:
 		"traits": traits, "memory": memory, "titles": titles, "legend": legend,
 		"deeds": deeds, "dynasty": dynasty, "generation": generation,
 		"parent_ids": parent_ids, "rival_id": rival_id, "religion": religion,
-		"faith": faith, "heir": heir
+		"faith": faith, "heir": heir, "inventory": inventory
 	}
 
 
@@ -436,4 +444,5 @@ static func from_dict(d: Dictionary) -> AgentData:
 	a.religion = str(d.get("religion", ""))
 	a.faith = float(d.get("faith", 50))
 	a.heir = bool(d.get("heir", false))
+	a.inventory = d.get("inventory", {}).duplicate()
 	return a

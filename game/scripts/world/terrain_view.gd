@@ -141,7 +141,10 @@ func _process(_delta: float) -> void:
 		var keys := dirty_chunks.keys()
 		# при активном мазке — щадящий бюджет, после паузы догоняем быстрее
 		var per_frame := chunks_per_frame
-		if Time.get_ticks_msec() - last_edit_ms > 160:
+		var active_stroke := Time.get_ticks_msec() - last_edit_ms < 160
+		if active_stroke and Engine.get_process_frames() % 2 != 0:
+			per_frame = 0
+		if not active_stroke:
 			per_frame = maxi(per_frame, 3)
 		var budget := mini(per_frame, keys.size())
 		for i in budget:

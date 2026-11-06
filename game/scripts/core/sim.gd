@@ -70,6 +70,10 @@ var heavy_step_fresh := false
 var monsters: Array = []
 var next_monster_id: int = 1
 var agents_cap: int = 900
+var caravans: Array = []
+var next_caravan_id: int = 1
+var ships: Array = []
+var next_ship_id: int = 1
 
 
 func setup(p_world: WorldModel, p_config: Dictionary) -> void:
@@ -87,6 +91,8 @@ func setup(p_world: WorldModel, p_config: Dictionary) -> void:
 	agents.clear(); agent_by_id.clear(); settlements.clear(); settlement_by_id.clear()
 	animals.clear(); animal_by_id.clear()
 	monsters.clear(); next_monster_id = 1
+	caravans.clear(); next_caravan_id = 1
+	ships.clear(); next_ship_id = 1
 	next_agent_id = 1; next_settlement_id = 1; next_animal_id = 1
 	burning.clear()
 	event_cooldowns.clear()
@@ -102,6 +108,8 @@ func populate(progress: Callable = Callable()) -> void:
 		var s := SettlementData.new()
 		s.setup(next_settlement_id, str(site.race), site.cell, year, rng)
 		s.name = _unique_name(s.name, s.id)
+		world.flatten_area(s.center, 10, 0.85)
+		s.last_stage = s.stage
 		var rel: Dictionary = RELIGIONS[rng.randi() % RELIGIONS.size()]
 		s.religion = str(rel.id)
 		s.zeal = rng.randf_range(30.0, 65.0)
@@ -190,11 +198,14 @@ func step_day() -> void:
 	if total_population < 30 and _active_wars_count() > 0:
 		_emergency_peace()
 	_time_part("vassals", func(): _vassals_daily())
+	_time_part("ruins", func(): _ruins_daily())
 	_time_part("legends", func(): _legends_daily())
 	_time_part("animals", func(): _animals_daily())
 	_time_part("monsters", func(): _monsters_daily())
 	_time_part("diplo", func(): _diplomacy_daily())
 	_time_part("roads", func(): _roads_tick())
+	_time_part("caravans", func(): _caravans_daily())
+	_time_part("ships", func(): _ships_daily())
 	_time_part("exp", func(): _expeditions_daily())
 	_time_part("fire", func(): _fire_daily())
 	_time_part("rad", func(): _radiation_daily())
@@ -285,6 +296,11 @@ func _update_settlement_counts() -> void:
 		if not s.destroyed:
 			total_population += s.population
 			s._update_stage(s.population)
+			if s.last_stage != s.stage:
+				if not s.last_stage.is_empty() and s.population > 0:
+					world.flatten_area(s.center, int(s.territory_radius * 0.75), 0.55)
+					world.add_clearing(s.center, s.territory_radius * 1.1)
+				s.last_stage = s.stage
 
 
 func _agents_daily() -> void:
@@ -365,6 +381,14 @@ func _agents_daily() -> void:
 			a.pregnant -= 1.0
 			if a.pregnant <= 0.0:
 				_give_birth(a)
+		if a.action == "mine":
+			a.inventory["stone"] = int(a.inventory.get("stone", 0)) + 1
+			if rng.randf() < 0.22:
+				a.inventory["iron"] = int(a.inventory.get("iron", 0)) + 1
+			if s != null:
+				s.resources["stone"] = minf(s.storage_cap(), float(s.resources.get("stone", 0.0)) + 0.8)
+		elif a.action == "work" and s != null and s.has_building("lumber"):
+			a.inventory["wood"] = int(a.inventory.get("wood", 0)) + 1
 		# старость
 		var lifespan: float = a.lifespan() * lifespan_mult
 		if not a.immortal and a.age >= lifespan:
@@ -517,6 +541,16 @@ func _choose_construction(s: SettlementData) -> void:
 		need = "quarry"
 	elif s.era >= 2 and not s.has_building("mine"):
 		need = "mine"
+	elif s.era >= 2 and (not s.wars.is_empty() or s.happiness < 0.0) and s.building_count("walls") < 1:
+		need = "walls"
+	elif s.era >= 2 and (not s.wars.is_empty() or s.population > 45) and s.building_count("tower") < 2:
+		need = "tower"
+	elif s.era >= 3 and s.population > 55 and s.building_count("tenement") < maxi(1, s.population / 22):
+		need = "tenement"
+	elif s.era >= 3 and s.building_count("walls") > 0 and s.building_count("bastion") < 1:
+		need = "bastion"
+	elif s.era >= 2 and s.building_count("harbor") < 1 and _near_water(Vector2(s.center), 8):
+		need = "harbor"
 	elif s.era >= 1 and s.building_count("granary") < 1:
 		need = "granary"
 	elif s.era >= 1 and s.happiness < 5.0 and not s.has_building("temple"):
@@ -827,6 +861,9 @@ func _sack_settlement(att: SettlementData, def: SettlementData) -> void:
 		conqueror.add_title("Завоеватель " + def.name)
 		conqueror.add_deed(20.0)
 		conqueror.remember("war", "Взял " + def.name, def.id, Vector2(def.center), 4.0, year)
+	def.ruin_loot = {}
+	for k in ["food", "wood", "stone", "iron", "gold", "goods"]:
+		def.ruin_loot[k] = float(loot.get(k, 0.0)) * 0.3
 	def.resources = {"food": 0.0, "wood": 0.0, "stone": 0.0, "iron": 0.0, "gold": 0.0, "goods": 0.0}
 	# гибель части населения
 	var victims: Array = []
@@ -882,6 +919,11 @@ func _destroy_settlement(s: SettlementData, reason: String) -> void:
 	s.war_target = -1
 	s.researching = ""
 	s.buildings.clear()
+	if s.ruin_loot.is_empty():
+		s.ruin_loot = {}
+		for k in ["food", "wood", "stone", "iron", "gold", "goods"]:
+			s.ruin_loot[k] = float(s.resources.get(k, 0.0)) * 0.3
+	s.resources = {"food": 0.0, "wood": 0.0, "stone": 0.0, "iron": 0.0, "gold": 0.0, "goods": 0.0}
 	_add_event(s, "war", L.tf("city_destroyed", [s.name]), 4, "ruin")
 	var refuge: SettlementData = null
 	var best_d := 9999.0
@@ -1193,6 +1235,7 @@ func _roads_tick() -> void:
 				road = {"progress": 0.0, "segments": [], "condition": 1.0, "to": other.id}
 				s.roads[other.id] = road
 				other.roads[s.id] = road
+			road["paved"] = s.techs.has("roads") and other.techs.has("roads")
 			var prog := float(road.get("progress", 0.0))
 			if prog >= 1.0:
 				road["condition"] = clampf(float(road.get("condition", 1.0)) - rng.randf_range(0.0, 0.0015), 0.4, 1.0)
@@ -1241,6 +1284,280 @@ func on_road(pos: Vector2, s: SettlementData) -> bool:
 			if pos.distance_squared_to(Vector2(float(seg[0]), float(seg[1]))) < 2.25:
 				return true
 	return false
+
+
+func _caravans_daily() -> void:
+	var done: Array = []
+	for c in caravans:
+		var home: SettlementData = settlement_by_id.get(int(c.home), null)
+		var other: SettlementData = settlement_by_id.get(int(c.to), null)
+		if home == null or other == null or home.destroyed or other.destroyed:
+			done.append(c)
+			continue
+		var lead: AgentData = agent_by_id.get(int(c.members[0]), null)
+		if lead == null or not lead.alive:
+			var any_alive := false
+			for mid in c.members:
+				var m: AgentData = agent_by_id.get(int(mid), null)
+				if m != null and m.alive:
+					any_alive = true
+					break
+			if not any_alive:
+				done.append(c)
+			continue
+		c.timer = float(c.timer) - 1.0
+		if c.phase == "out" and lead.pos.distance_to(Vector2(other.center)) < 3.0:
+			var cargo := float(c.cargo)
+			home.resources["goods"] = maxf(0.0, float(home.resources.get("goods", 0.0)) - cargo)
+			home.resources["food"] = maxf(0.0, float(home.resources.get("food", 0.0)) - cargo * 0.5)
+			other.resources["goods"] = minf(other.storage_cap(), float(other.resources.get("goods", 0.0)) + cargo)
+			other.resources["food"] = minf(other.storage_cap(), float(other.resources.get("food", 0.0)) + cargo * 0.5)
+			var gold := cargo * 2.5
+			other.resources["gold"] = maxf(0.0, float(other.resources.get("gold", 0.0)) - gold)
+			home.resources["gold"] = minf(home.storage_cap(), float(home.resources.get("gold", 0.0)) + gold)
+			home.resources["gold"] = minf(home.storage_cap(), float(home.resources["gold"]) + cargo)
+			_add_event(home, "trade", "Караван %s — %s: торговля на %d товаров" % [home.name, other.name, int(cargo)], 1, "trade")
+			_add_event(other, "trade", "Караван из %s привёз товары" % home.name, 1, "trade")
+			c.phase = "return"
+			c.timer = 90.0
+			for mid in c.members:
+				var m2: AgentData = agent_by_id.get(int(mid), null)
+				if m2 != null and m2.alive:
+					m2.set_action("trade", Vector2(home.center), "return", 45.0)
+					m2.carrying = ""
+		elif c.phase == "return" and lead.pos.distance_to(Vector2(home.center)) < 3.0:
+			done.append(c)
+			for mid in c.members:
+				var m3: AgentData = agent_by_id.get(int(mid), null)
+				if m3 != null and m3.alive:
+					m3.set_action("idle", Vector2(home.center), "returned", 1.0)
+					m3.set_emotion("happy", "trade", 12.0)
+					m3.inventory["gold"] = int(m3.inventory.get("gold", 0)) + 2
+		elif float(c.timer) <= 0.0:
+			c.phase = "return"
+			for mid in c.members:
+				var m4: AgentData = agent_by_id.get(int(mid), null)
+				if m4 != null and m4.alive:
+					m4.set_action("trade", Vector2(home.center), "return", 50.0)
+	for c in done:
+		caravans.erase(c)
+	# новый караван по готовой дороге
+	for sv in settlements:
+		var s: SettlementData = sv
+		if s.destroyed or s.population < 12:
+			continue
+		var has := false
+		for c2 in caravans:
+			if int(c2.home) == s.id:
+				has = true
+				break
+		if has:
+			continue
+		for oid in s.roads:
+			var r: Dictionary = s.roads[oid]
+			if float(r.get("progress", 0.0)) < 1.0:
+				continue
+			var o: SettlementData = settlement_by_id.get(int(oid), null)
+			if o == null or o.destroyed:
+				continue
+			if s.wars.has(o.id):
+				continue
+			if not (s.has_building("market") or s.era >= 2) or not (o.has_building("market") or o.era >= 2):
+				continue
+			if float(s.resources.get("goods", 0.0)) < 1.0 and float(s.resources.get("food", 0.0)) < 40.0:
+				continue
+			if rng.randf() > 0.006:
+				continue
+			var pool: Array = []
+			for av in agents:
+				var a: AgentData = av
+				if a.alive and a.settlement_id == s.id and a.is_adult() and a.role not in ["leader", "warrior", "child"]:
+					pool.append(a)
+			if pool.size() < 2:
+				break
+			var members: Array = []
+			for i in 2:
+				var m5: AgentData = pool[i]
+				members.append(m5.id)
+				m5.set_action("trade", Vector2(o.center), "caravan", 60.0)
+				m5.carrying = "goods"
+				m5.carry_amount = 1.0
+				m5.inventory["goods"] = int(m5.inventory.get("goods", 0)) + 2
+			var cargo2 := minf(16.0, float(s.resources.get("goods", 0.0)) + float(s.resources.get("food", 0.0)) * 0.04)
+			if cargo2 < 2.0:
+				break
+			caravans.append({"id": next_caravan_id, "home": s.id, "to": o.id, "members": members, "phase": "out", "timer": 120.0, "cargo": cargo2})
+			next_caravan_id += 1
+			_add_event(s, "trade", "Караван из %s отправился в %s" % [s.name, o.name], 2, "trade")
+			break
+
+
+func _ships_daily() -> void:
+	if int(day) % 2 != 0:
+		return
+	var dead: Array = []
+	for sh in ships:
+		var home: SettlementData = settlement_by_id.get(int(sh.home), null)
+		if home == null or home.destroyed:
+			dead.append(sh)
+			continue
+		sh.timer = float(sh.timer) - 1.0
+		var pos: Vector2 = sh.pos
+		var kind := str(sh.kind)
+		if kind == "fishing":
+			if world.is_water_cell(int(pos.x), int(pos.y)) and rng.randf() < 0.6:
+				home.resources["food"] = minf(home.storage_cap(), float(home.resources.get("food", 0.0)) + 2.0)
+			if float(sh.timer) <= 0.0 or pos.distance_to(Vector2(sh.target)) < 2.0:
+				var w := home.water_cell
+				if w.x >= 0:
+					sh.target = Vector2(w)
+				sh.timer = rng.randi_range(20, 50)
+		elif kind == "cargo":
+			if str(sh.phase) == "out":
+				var to: SettlementData = settlement_by_id.get(int(sh.to), null)
+				if to == null or to.destroyed:
+					dead.append(sh)
+					continue
+				if pos.distance_to(Vector2(sh.target)) < 4.0:
+					var cargo := float(sh.cargo)
+					home.resources["goods"] = maxf(0.0, float(home.resources.get("goods", 0.0)) - cargo)
+					to.resources["goods"] = minf(to.storage_cap(), float(to.resources.get("goods", 0.0)) + cargo)
+					var gold := cargo * 3.0
+					to.resources["gold"] = maxf(0.0, float(to.resources.get("gold", 0.0)) - gold)
+					home.resources["gold"] = minf(home.storage_cap(), float(home.resources.get("gold", 0.0)) + gold)
+					_add_event(home, "trade", "Морская торговля %s — %s" % [home.name, to.name], 1, "ship")
+					sh.phase = "return"
+					var wh := home.water_cell
+					if wh.x >= 0:
+						sh.target = Vector2(wh)
+			elif pos.distance_to(Vector2(sh.target)) < 4.0:
+				dead.append(sh)
+		elif kind == "warship":
+			var enemy: SettlementData = settlement_by_id.get(int(sh.to), null)
+			if enemy == null or enemy.destroyed or home.wars.is_empty():
+				dead.append(sh)
+				continue
+			for other in ships:
+				if other == sh or int(other.home) == home.id:
+					continue
+				if Vector2(other.pos).distance_to(pos) < 6.0:
+					other.hp = float(other.get("hp", 60.0)) - 12.0
+					sh.hp = float(sh.get("hp", 80.0)) - 4.0
+					if float(other.hp) <= 0.0:
+						other.alive = false
+						_add_event(home, "war", "%s потопил корабль %s" % [home.name, settlement_by_id.get(int(other.home), home).name if settlement_by_id.has(int(other.home)) else "врага"], 2, "ship")
+			if pos.distance_to(Vector2(enemy.center)) < 8.0 and rng.randf() < 0.3:
+				for a in agents:
+					if a.alive and a.settlement_id == enemy.id and a.pos.distance_to(pos) < 5.0:
+						a.health -= 12.0
+						if a.health <= 0.0:
+							kill_agent(a, "war")
+				if not enemy.buildings.is_empty() and rng.randf() < 0.2:
+					var bi := rng.randi() % enemy.buildings.size()
+					enemy.buildings[bi]["hp"] = float(enemy.buildings[bi].get("hp", 100)) - 15.0
+					if float(enemy.buildings[bi].hp) <= 0.0:
+						enemy.buildings.remove_at(bi)
+						settlement_structure_changed.emit(enemy.id)
+		if float(sh.get("hp", 1.0)) <= 0.0:
+			dead.append(sh)
+		elif float(sh.timer) < -900.0:
+			dead.append(sh)
+	for sh2 in dead:
+		ships.erase(sh2)
+	# новые корабли
+	for sv in settlements:
+		var s: SettlementData = sv
+		if s.destroyed or s.population < 10:
+			continue
+		if not _is_coastal(s):
+			continue
+		if not (s.has_building("harbor") or s.era >= 1):
+			continue
+		var owned := 0
+		for sh3 in ships:
+			if int(sh3.home) == s.id:
+				owned += 1
+		if owned >= 3:
+			continue
+		if rng.randf() > 0.012:
+			continue
+		var w2 := s.water_cell
+		if w2.x < 0:
+			w2 = _water_near(s.center, 14)
+		if w2.x < 0:
+			continue
+		var kind2 := "fishing"
+		var to_id := -1
+		if not s.wars.is_empty() and rng.randf() < 0.45:
+			kind2 = "warship"
+			to_id = int(s.wars[0])
+		elif float(s.resources.get("goods", 0.0)) > 6.0 and rng.randf() < 0.55:
+			kind2 = "cargo"
+			var other := _nearest_coastal_other(s, 90.0)
+			if other != null:
+				to_id = other.id
+			else:
+				kind2 = "fishing"
+		var target := Vector2(w2)
+		if kind2 != "fishing" and to_id >= 0:
+			var ds: SettlementData = settlement_by_id.get(to_id, null)
+			if ds != null:
+				var tw := ds.water_cell
+				if tw.x < 0:
+					tw = _water_near(ds.center, 14)
+				if tw.x >= 0:
+					target = Vector2(tw)
+		var hp := 120.0 if kind2 == "warship" else 70.0
+		ships.append({
+			"id": next_ship_id, "kind": kind2, "home": s.id, "to": to_id,
+			"pos": Vector2(w2), "target": target, "hp": hp, "max_hp": hp,
+			"cargo": minf(16.0, float(s.resources.get("goods", 0.0)) * 0.2 + 3.0),
+			"phase": "out", "timer": 120.0, "alive": true
+		})
+		next_ship_id += 1
+		_add_event(s, "ship", "%s спускает на воду %s" % [s.name, _ship_name(kind2)], 1, "ship")
+
+
+func _ship_name(kind: String) -> String:
+	match kind:
+		"fishing": return "рыболовную лодку"
+		"cargo": return "грузовую баржу"
+		"warship": return "военный фрегат"
+	return "корабль"
+
+
+func _is_coastal(s: SettlementData) -> bool:
+	if s.water_cell.x < 0:
+		return false
+	return Vector2(s.water_cell).distance_to(Vector2(s.center)) < 14.0
+
+
+func _water_near(cell: Vector2i, radius: int) -> Vector2i:
+	for r in range(1, radius + 1):
+		for dz in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if maxi(absi(dx), absi(dz)) != r:
+					continue
+				var x := cell.x + dx
+				var z := cell.y + dz
+				if world.in_bounds(x, z) and world.water[world.idx(x, z)] > 0.01:
+					return Vector2i(x, z)
+	return Vector2i(-1, -1)
+
+
+func _nearest_coastal_other(s: SettlementData, max_dist: float) -> SettlementData:
+	var best: SettlementData = null
+	var bd := max_dist
+	for o in settlements:
+		if o.id == s.id or o.destroyed or s.wars.has(o.id):
+			continue
+		if not _is_coastal(o):
+			continue
+		var d := Vector2(o.center).distance_to(Vector2(s.center))
+		if d < bd:
+			bd = d
+			best = o
+	return best
 
 
 func _expeditions_daily() -> void:
@@ -1404,6 +1721,64 @@ func _emergency_peace() -> void:
 			var o: SettlementData = settlement_by_id.get(int(eid), null)
 			if o != null:
 				make_peace(s, o, true)
+
+
+func _ruins_daily() -> void:
+	for ru in settlements:
+		if not ru.destroyed:
+			continue
+		var total := 0.0
+		for k in ru.ruin_loot:
+			total += float(ru.ruin_loot[k])
+		if total <= 0.5:
+			continue
+		var home: SettlementData = null
+		var bd := 32.0
+		for s in settlements:
+			if s.destroyed or s.id == ru.id:
+				continue
+			var d := Vector2(s.center).distance_to(Vector2(ru.center))
+			if d < bd:
+				bd = d
+				home = s
+		if home == null:
+			continue
+		var crew: Array = []
+		for av in agents:
+			var a: AgentData = av
+			if not a.alive or a.settlement_id != home.id:
+				continue
+			if a.action == "scavenge" or (a.is_adult() and crew.size() < 2 and rng.randf() < 0.03):
+				crew.append(a)
+		for a in crew:
+			if a.action != "scavenge":
+				a.set_action("scavenge", Vector2(ru.center) + Vector2(rng.randf_range(-1.5, 1.5), rng.randf_range(-1.5, 1.5)), "ruins", 6.0)
+		var looter: AgentData = null
+		for a in crew:
+			if a.pos.distance_to(Vector2(ru.center)) < 8.0:
+				looter = a
+				break
+		if looter == null:
+			continue
+		var moved := false
+		for k in ["food", "wood", "stone", "iron", "gold"]:
+			var amt := minf(2.0, float(ru.ruin_loot.get(k, 0.0)))
+			if amt <= 0.01:
+				continue
+			ru.ruin_loot[k] = float(ru.ruin_loot[k]) - amt
+			home.resources[k] = minf(home.storage_cap(), float(home.resources.get(k, 0.0)) + amt)
+			looter.inventory[k] = int(looter.inventory.get(k, 0)) + 1
+			moved = true
+		if moved:
+			looter.add_deed(0.4)
+			looter.remember("scavenge", "Собрал припасы в руинах " + ru.name, ru.id, Vector2(ru.center), 0.4, year)
+			_add_event(home, "scavenge", "%s собирает припасы в руинах %s" % [home.name, ru.name], 1, "ruin")
+		var left := 0.0
+		for k2 in ru.ruin_loot:
+			left += float(ru.ruin_loot[k2])
+		if left <= 0.5:
+			ru.ruin_loot = {}
+			_add_event(home, "scavenge", "Руины %s полностью разобраны" % ru.name, 2, "ruin")
 
 
 func _vassals_daily() -> void:	for sv in settlements:
@@ -1613,6 +1988,8 @@ func _expand_colony(parent: SettlementData) -> void:
 	s.religion = parent.religion
 	s.zeal = parent.zeal
 	s.dynasty = parent.dynasty
+	world.flatten_area(s.center, 9, 0.8)
+	s.last_stage = s.stage
 	next_settlement_id += 1
 	s.resources = parent.resources.duplicate()
 	for k in s.resources:
@@ -1671,6 +2048,8 @@ func _found_colony_from_expedition(home: SettlementData, cell: Vector2i, members
 	s.relations[home.id] = 70.0
 	home.relations[s.id] = 70.0
 	s.dynasty = home.dynasty
+	world.flatten_area(s.center, 8, 0.8)
+	s.last_stage = s.stage
 	settlements.append(s)
 	settlement_by_id[s.id] = s
 	world.add_clearing(s.center, 8.0)
@@ -1924,7 +2303,7 @@ func _assign_targets(s: SettlementData, local: Array) -> void:
 		var a: AgentData = av
 		if not a.alive:
 			continue
-		if a.action == "explore":
+		if a.action in ["explore", "scavenge", "trade"]:
 			continue
 		if a.age >= a.maturity() and a.role == "child":
 			a.role = "worker"
@@ -1938,6 +2317,8 @@ func _assign_targets(s: SettlementData, local: Array) -> void:
 				a.role = "hunter"
 			elif a.id % 11 == 0 and s.has_building("library"):
 				a.role = "scholar"
+			elif a.id % 9 == 0 and (s.has_building("mine") or s.has_building("quarry")):
+				a.role = "miner"
 		if a.role == "warrior" and enemy != null and not enemy.destroyed:
 			var phase := "march"
 			var wt := Vector2(enemy.center)
@@ -1995,6 +2376,16 @@ func _assign_targets(s: SettlementData, local: Array) -> void:
 		var u_social: float = clampf((18.0 - a.mood) / 36.0, 0.0, 1.0) * 0.55 + a.personality("sociability") / 340.0
 		var u_pray: float = clampf(maxf(0.0, -s.happiness) / 60.0, 0.0, 1.0) * 0.5 + a.personality("piety") / 360.0
 		var u_patrol: float = a.personality("curiosity") / 420.0
+		var mine_b: Dictionary = _building_of_type(s, "mine")
+		if mine_b.is_empty():
+			mine_b = _building_of_type(s, "quarry")
+		var u_mine := 0.0
+		if not mine_b.is_empty():
+			u_mine = 0.85 + a.personality("ambition") / 420.0
+			if float(s.resources.get("stone", 0.0)) < 30.0 or float(s.resources.get("iron", 0.0)) < 12.0:
+				u_mine += 0.45
+			if a.role == "miner":
+				u_mine += 0.35
 		var monster: Dictionary = _nearest_monster(a.pos, 16.0)
 		var u_fight := 0.0
 		var u_flee := 0.0
@@ -2018,6 +2409,7 @@ func _assign_targets(s: SettlementData, local: Array) -> void:
 		if u_pray > best_u: best = "pray"; best_u = u_pray
 		if u_fight > best_u: best = "fight"; best_u = u_fight
 		if u_flee > best_u: best = "flee"; best_u = u_flee
+		if u_mine > best_u: best = "mine"; best_u = u_mine
 		if u_patrol > best_u: best = "patrol"; best_u = u_patrol
 		match best:
 			"sleep":
@@ -2082,6 +2474,9 @@ func _assign_targets(s: SettlementData, local: Array) -> void:
 			"patrol":
 				var pang := rng.randf() * TAU
 				a.set_action("patrol", center + Vector2(cos(pang), sin(pang)) * radius, "curiosity", 5.0)
+			"mine":
+				a.inventory["pickaxe"] = 1
+				a.set_action("mine", Vector2(float(mine_b.x), float(mine_b.z)) + Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1)), "ore", 4.0)
 			_:
 				if not s.buildings.is_empty():
 					var b: Dictionary = s.buildings[rng.randi() % s.buildings.size()]
@@ -2170,6 +2565,7 @@ func complete_haul(a: AgentData) -> void:
 		s.resources["food"] = minf(float(s.resources["food"]), s.storage_cap())
 	a.carrying = ""
 	a.carry_amount = 0.0
+	a.inventory["food"] = int(a.inventory.get("food", 0)) + maxi(1, int(gained / 30.0))
 	a.set_action("eat", a.pos, "food", 1.0)
 	a.set_emotion("happy", "food", 10.0)
 
@@ -2742,6 +3138,8 @@ func spawn_tribe(cx: int, cz: int) -> SettlementData:
 	var s := SettlementData.new()
 	s.setup(next_settlement_id, race, cell, year, rng)
 	s.name = _unique_name(s.name, s.id)
+	world.flatten_area(s.center, 10, 0.85)
+	s.last_stage = s.stage
 	var rel: Dictionary = RELIGIONS[rng.randi() % RELIGIONS.size()]
 	s.religion = str(rel.id)
 	s.zeal = rng.randf_range(30.0, 70.0)
@@ -2971,6 +3369,15 @@ func to_dict() -> Dictionary:
 			"hp": float(m.hp), "max_hp": float(m.max_hp), "power": float(m.power),
 			"speed": float(m.speed), "size": float(m.size), "alive": bool(m.alive), "age": float(m.get("age", 0.0))
 		})
+	var shp: Array = []
+	for sh in ships:
+		shp.append({
+			"id": int(sh.id), "kind": str(sh.kind), "home": int(sh.home), "to": int(sh.to),
+			"pos": [sh.pos.x, sh.pos.y], "target": [sh.target.x, sh.target.y],
+			"hp": float(sh.get("hp", 70.0)), "max_hp": float(sh.get("max_hp", 70.0)),
+			"cargo": float(sh.get("cargo", 0.0)), "phase": str(sh.get("phase", "out")),
+			"timer": float(sh.get("timer", 0.0))
+		})
 	return {
 		"day": day, "year": year, "season": season, "total_population": total_population,
 		"next_agent_id": next_agent_id, "next_settlement_id": next_settlement_id,
@@ -2978,7 +3385,8 @@ func to_dict() -> Dictionary:
 		"settlements": st, "chronicle": chronicle.to_dict(),
 		"weather": weather_mode, "weather_days_left": weather_days_left, "nuclear_winter": nuclear_winter,
 		"nukes_total": nukes_total, "world_age_years": world_age_years,
-		"burning": burning.keys(), "monsters": mo, "next_monster_id": next_monster_id
+		"burning": burning.keys(), "monsters": mo, "next_monster_id": next_monster_id,
+		"ships": shp, "next_ship_id": next_ship_id
 	}
 
 
@@ -3032,6 +3440,8 @@ func from_dict(d: Dictionary) -> void:
 			a.religion = sa.religion if sa != null else str(RELIGIONS[rng.randi() % RELIGIONS.size()].id)
 		if a.dynasty.is_empty():
 			a.dynasty = a.family
+		if a.action in ["explore", "scavenge", "trade"]:
+			a.set_action("idle", a.pos, "resume", 1.0)
 	chronicle = ChronicleData.from_dict(d.get("chronicle", {}))
 	monsters.clear()
 	for md in d.get("monsters", []):
@@ -3048,6 +3458,20 @@ func from_dict(d: Dictionary) -> void:
 			"age": float(md.get("age", 0.0))
 		})
 	next_monster_id = int(d.get("next_monster_id", monsters.size() + 1))
+	ships.clear()
+	for sd2 in d.get("ships", []):
+		var sp: Array = sd2.get("pos", [0, 0])
+		var st2: Array = sd2.get("target", [0, 0])
+		ships.append({
+			"id": int(sd2.get("id", 0)), "kind": str(sd2.get("kind", "fishing")),
+			"home": int(sd2.get("home", -1)), "to": int(sd2.get("to", -1)),
+			"pos": Vector2(float(sp[0]), float(sp[1])),
+			"target": Vector2(float(st2[0]), float(st2[1])),
+			"hp": float(sd2.get("hp", 70)), "max_hp": float(sd2.get("max_hp", 70)),
+			"cargo": float(sd2.get("cargo", 0)), "phase": str(sd2.get("phase", "out")),
+			"timer": float(sd2.get("timer", 0))
+		})
+	next_ship_id = int(d.get("next_ship_id", ships.size() + 1))
 	burning.clear()
 	for k in d.get("burning", []):
 		burning[int(k)] = world.burn[int(k)] if int(k) < world.n() else 0.0

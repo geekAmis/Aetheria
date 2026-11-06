@@ -14,14 +14,22 @@ var agent_colors: Dictionary = {}      # id -> Color
 var animal_mm: MultiMeshInstance3D
 var animal_index: Dictionary = {}
 var monster_nodes: Dictionary = {}
+var ship_nodes: Dictionary = {}
 var focus_cell := Vector2(-1, -1)
 var lod_radius := 120.0
 var lod_timer := 0.0
 var last_lod_focus := Vector2(-1, -1)
+var lod_level := 0
+var show_icons := true
+var speech_pool: Array = []
+var speech_active: Array = []
+var speech_timer := 0.0
 var emotion_mm: MultiMeshInstance3D
 var emotion_slot: Dictionary = {}
 var carry_mm: MultiMeshInstance3D
 var carry_slot: Dictionary = {}
+var tool_mm: MultiMeshInstance3D
+var tool_slot: Dictionary = {}
 var slots_dirty := true
 var selected_id: int = -1
 var ring: MeshInstance3D
@@ -83,7 +91,7 @@ func setup(p_world: WorldModel, p_sim: SimWorld) -> void:
 
 	# эмоции над головой — маленькие цветные ромбы
 	var quad := QuadMesh.new()
-	quad.size = Vector2(0.55, 0.55)
+	quad.size = Vector2(0.26, 0.26)
 	var emat := StandardMaterial3D.new()
 	emat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	emat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
@@ -117,6 +125,18 @@ func setup(p_world: WorldModel, p_sim: SimWorld) -> void:
 	carry_mm.material_override = MeshKit.vertex_material()
 	carry_mm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(carry_mm)
+
+	tool_mm = MultiMeshInstance3D.new()
+	tool_mm.name = "Tools"
+	var tmm := MultiMesh.new()
+	tmm.transform_format = MultiMesh.TRANSFORM_3D
+	tmm.use_colors = true
+	tmm.instance_count = 0
+	tmm.mesh = MeshKit.tool_mesh("pickaxe")
+	tool_mm.multimesh = tmm
+	tool_mm.material_override = MeshKit.vertex_material()
+	tool_mm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	add_child(tool_mm)
 
 	# маркер выбора
 	ring = MeshInstance3D.new()
@@ -170,6 +190,8 @@ func _process(delta: float) -> void:
 	_sync_agents(delta)
 	_sync_animals()
 	_sync_monsters()
+	_sync_ships()
+	_update_speech(delta)
 	last_sync_us = Time.get_ticks_usec() - t0
 	_update_selection(delta)
 
@@ -214,13 +236,28 @@ func rebuild_slots() -> void:
 		if lod and a.pos.distance_to(focus_cell) > lod_radius:
 			continue
 		visible.append(a)
-	emotion_mm.multimesh.instance_count = visible.size()
+	if show_icons:
+		emotion_mm.multimesh.instance_count = visible.size()
+		carry_mm.multimesh.instance_count = visible.size()
+		tool_mm.multimesh.instance_count = visible.size()
+	else:
+		emotion_mm.multimesh.instance_count = 0
+		carry_mm.multimesh.instance_count = 0
+		tool_mm.multimesh.instance_count = 0
 	carry_slot.clear()
-	carry_mm.multimesh.instance_count = visible.size()
+	tool_slot.clear()
 	for i in visible.size():
 		var id: int = visible[i].id
-		emotion_slot[id] = i
-		carry_slot[id] = i
+		if show_icons:
+			emotion_slot[id] = i
+			carry_slot[id] = i
+			tool_slot[id] = i
+			var hid := Transform3D(Basis.from_scale(Vector3.ONE * 0.001), Vector3.ZERO)
+			emotion_mm.multimesh.set_instance_transform(i, hid)
+			carry_mm.multimesh.set_instance_transform(i, hid)
+			tool_mm.multimesh.set_instance_transform(i, hid)
+			carry_mm.multimesh.set_instance_color(i, Color(0.7, 0.55, 0.35))
+			tool_mm.multimesh.set_instance_color(i, Color(0.9, 0.9, 0.9))
 
 	animal_index.clear()
 	var amm := animal_mm.multimesh
@@ -315,6 +352,7 @@ func _sync_agents(delta: float) -> void:
 		mm.set_instance_transform(int(slot[1]), Transform3D(basis, Vector3(wp.x, ground + y_off, wp.z)))
 		_update_emotion_icon(a, wp, ground, t)
 		_update_carry(a, wp, ground, ang, t)
+		_update_tool(a, wp, ground, ang, t, moving)
 
 
 func _update_emotion_icon(a: AgentData, wp: Vector3, ground: float, t: float) -> void:
@@ -323,13 +361,13 @@ func _update_emotion_icon(a: AgentData, wp: Vector3, ground: float, t: float) ->
 		return
 	var mm: MultiMesh = emotion_mm.multimesh
 	var e := a.emotion
-	if e == "neutral" or a.emotion_timer <= 0.0:
+	if e == "neutral" or a.emotion_timer <= 0.0 or (e == "happy" and not a.favourite):
 		mm.set_instance_transform(idx, Transform3D(Basis.from_scale(Vector3.ONE * 0.001), Vector3(wp.x, ground, wp.z)))
 		return
 	var col: Color = emotion_colors.get(e, Color.WHITE)
 	var s := 1.0 + sin(t * 5.0 + float(a.id)) * 0.12
-	var b := Basis(Vector3.UP, 0.0) * Basis.from_scale(Vector3(s, s, s))
-	mm.set_instance_transform(idx, Transform3D(b, Vector3(wp.x, ground + 3.4, wp.z)))
+	var b := Basis.from_scale(Vector3(s, s, s))
+	mm.set_instance_transform(idx, Transform3D(b, Vector3(wp.x, ground + 3.05, wp.z)))
 	mm.set_instance_color(idx, col)
 
 
@@ -354,6 +392,21 @@ func _update_carry(a: AgentData, wp: Vector3, ground: float, ang: float, t: floa
 	var bob := absf(sin(t * 9.0 + float(a.id))) * 0.05
 	mm.set_instance_transform(idx, Transform3D(Basis.from_scale(Vector3(s, s, s)), Vector3(wp.x, ground + off.y + bob, wp.z) + Vector3(off.x, 0, off.z)))
 	mm.set_instance_color(idx, col)
+
+
+func _update_tool(a: AgentData, wp: Vector3, ground: float, ang: float, t: float, moving: bool) -> void:
+	var idx: int = tool_slot.get(a.id, -1)
+	if idx < 0:
+		return
+	var mm: MultiMesh = tool_mm.multimesh
+	var working := a.action in ["mine", "build"] or (a.role == "builder" and a.action == "work")
+	if not working or moving:
+		mm.set_instance_transform(idx, Transform3D(Basis.from_scale(Vector3.ONE * 0.001), Vector3(wp.x, ground, wp.z)))
+		return
+	var swing := sin(t * 12.0 + float(a.id)) * 0.7
+	var off := Vector3(0.34, 1.02, 0.08).rotated(Vector3.UP, ang)
+	var basis := Basis(Vector3.UP, ang) * Basis(Vector3.RIGHT, -0.5 + swing) * Basis.from_scale(Vector3.ONE * 1.15)
+	mm.set_instance_transform(idx, Transform3D(basis, Vector3(wp.x, ground, wp.z) + Vector3(off.x, off.y, off.z)))
 
 
 func _sync_animals() -> void:
@@ -417,6 +470,110 @@ func _sync_monsters() -> void:
 			monster_nodes.erase(id)
 
 
+func _sync_ships() -> void:
+	var alive_ids: Dictionary = {}
+	for sh in sim.ships:
+		var id := int(sh.id)
+		alive_ids[id] = true
+		var node: MeshInstance3D = ship_nodes.get(id, null)
+		if node == null:
+			node = MeshInstance3D.new()
+			node.name = "Ship_%d" % id
+			node.mesh = MeshKit.ship_mesh(str(sh.kind))
+			node.material_override = MeshKit.vertex_material()
+			node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+			add_child(node)
+			ship_nodes[id] = node
+		var p: Vector2 = sh.pos
+		var half := world.size * 0.5
+		var cx := int(clampi(int(p.x), 0, world.size - 1))
+		var cz := int(clampi(int(p.y), 0, world.size - 1))
+		var wy := world.water_surface_y(cx, cz) - 0.15
+		var t: Vector2 = sh.target
+		var ang := atan2(t.x - p.x, t.y - p.y)
+		var bob := sin(anim_time * 1.8 + float(id)) * 0.10
+		node.position = Vector3((p.x - half) * WorldModel.CELL, wy + bob, (p.y - half) * WorldModel.CELL)
+		node.rotation = Vector3(0, ang, 0)
+		node.scale = Vector3.ONE * 1.5
+		node.visible = lod_level < 2 or (focus_cell.x >= 0.0 and p.distance_to(focus_cell) < lod_radius * 1.2)
+	for id in ship_nodes.keys():
+		if not alive_ids.has(id):
+			var n: MeshInstance3D = ship_nodes[id]
+			if is_instance_valid(n):
+				n.queue_free()
+			ship_nodes.erase(id)
+
+
+func _update_speech(delta: float) -> void:
+	speech_timer -= delta
+	var keep: Array = []
+	for s in speech_active:
+		s.t -= delta
+		var a: AgentData = sim.agent_by_id.get(int(s.id), null)
+		if s.t <= 0.0 or a == null or not a.alive:
+			s.label.visible = false
+			continue
+		var p := a.pos
+		var half := world.size * 0.5
+		var wy := world.terrain_y(p.x, p.y) + 3.2
+		s.label.position = Vector3((p.x - half) * WorldModel.CELL, wy, (p.y - half) * WorldModel.CELL)
+		keep.append(s)
+	speech_active = keep
+	if speech_timer > 0.0 or lod_level >= 2:
+		return
+	speech_timer = 0.65
+	var candidates: Array = []
+	for av in sim.agents:
+		var a: AgentData = av
+		if not a.alive or a.action != "socialize":
+			continue
+		if focus_cell.x >= 0.0 and a.pos.distance_to(focus_cell) > 90.0:
+			continue
+		candidates.append(a)
+	if candidates.is_empty():
+		return
+	var a2: AgentData = candidates[randi() % candidates.size()]
+	_show_speech(a2)
+
+
+func _show_speech(a: AgentData) -> void:
+	var lines := [
+		"Мир тебе.", "Как дела?", "Слышал новости?", "Хороший день.",
+		"Боги смотрят на нас.", "Нужно больше еды.", "Дорога готова.",
+		"Бойся дракона.", "Мой дом — твой дом.", "Что слышно на рынке?"
+	]
+	if a.emotion == "hungry":
+		lines = ["Есть что-нибудь?", "Голодно...", "Где еда?"]
+	elif a.emotion == "afraid":
+		lines = ["Оно близко!", "Бежим!", "Спасите!"]
+	elif a.emotion == "angry":
+		lines = ["Не лезь.", "Это моя земля.", "Я тебе покажу."]
+	elif a.religion != "":
+		lines.append(sim.religion_name(a.religion) + " хранит нас.")
+	var label: Label3D = null
+	for s in speech_pool:
+		if not s.visible:
+			label = s
+			break
+	if label == null:
+		label = Label3D.new()
+		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		label.no_depth_test = true
+		label.font_size = 13
+		label.outline_size = 6
+		label.outline_modulate = Color(0, 0, 0, 0.85)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.pixel_size = 0.0010
+		add_child(label)
+		speech_pool.append(label)
+		if speech_pool.size() >= 10:
+			speech_timer = 2.0
+	label.text = lines[randi() % lines.size()]
+	label.modulate = Color(1, 0.95, 0.8)
+	label.visible = true
+	speech_active.append({"id": a.id, "label": label, "t": 2.6})
+
+
 func _update_selection(delta: float) -> void:
 	pulse += delta
 	if selected_id < 0:
@@ -455,6 +612,15 @@ func set_selected(id: int) -> void:
 
 func set_focus(p: Vector2) -> void:
 	focus_cell = p
+
+
+func set_lod(level: int) -> void:
+	if level == lod_level:
+		return
+	lod_level = level
+	show_icons = level < 2
+	lod_radius = [150.0, 100.0, 60.0][clampi(level, 0, 2)]
+	slots_dirty = true
 
 
 func _on_effect(kind: String, pos: Vector2, _radius: float, _data: Dictionary) -> void:

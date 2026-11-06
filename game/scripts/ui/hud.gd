@@ -19,6 +19,8 @@ signal rename_agent_requested(id: int)
 signal spawn_requested(kind: String, data: Dictionary)
 signal inspect_agent_requested(id: int)
 signal spawn_monster_requested(kind: String)
+signal perk_toggled(id: int, perk: String, enabled: bool)
+signal immortal_toggled(id: int, enabled: bool)
 signal server_settings_changed
 
 var game: GameSession
@@ -657,7 +659,7 @@ func refresh_inspector() -> void:
 			_refresh_agent_live(a)
 		return
 	var now_ms := Time.get_ticks_msec()
-	if kind == inspector_kind and id == inspector_id and now_ms - inspector_build_ms < 900:
+	if kind == inspector_kind and id == inspector_id and now_ms - inspector_build_ms < 2200:
 		return
 	inspector_build_ms = now_ms
 	inspector_sig = sig
@@ -796,6 +798,14 @@ func _build_agent_card(a: AgentData) -> void:
 		for i in range(maxi(0, a.memory.size() - 3), a.memory.size()):
 			var mem: Dictionary = a.memory[i]
 			panel_content.add_child(_lbl("• " + str(mem.get("text", "")), "Small", ThemeBuilder.MUTED, 10))
+	if not a.inventory.is_empty():
+		var inv_h := _hbox(3)
+		for item in a.inventory:
+			var cnt := int(a.inventory[item])
+			if cnt <= 0:
+				continue
+			inv_h.add_child(_chip("%s ×%d" % [_item_name(str(item)), cnt], ThemeBuilder.TEAL))
+		panel_content.add_child(inv_h)
 	panel_content.add_child(_hairline())
 	var god := _hbox(4)
 	var heal_b := _button("Исцелить", "GhostButton")
@@ -816,13 +826,9 @@ func _build_agent_card(a: AgentData) -> void:
 	reward_b.add_theme_font_size_override("font_size", 11)
 	reward_b.pressed.connect(func(): god_agent_action.emit("reward"))
 	god2.add_child(reward_b)
-	var imm_b := _button("Бессмертие", "GhostButton")
-	imm_b.add_theme_font_size_override("font_size", 11)
-	imm_b.pressed.connect(func(): god_agent_action.emit("immortal"))
-	god2.add_child(imm_b)
-	var perk_b := _button("Перк", "GhostButton")
+	var perk_b := _button("Перки", "GhostButton")
 	perk_b.add_theme_font_size_override("font_size", 11)
-	perk_b.pressed.connect(func(): god_agent_action.emit("perk_tough"))
+	perk_b.pressed.connect(func(): open_perk_dialog(a))
 	god2.add_child(perk_b)
 	var fav_b := _button("★" if a.favourite else "☆", "GhostButton")
 	fav_b.add_theme_font_size_override("font_size", 11)
@@ -843,6 +849,15 @@ func _build_agent_card(a: AgentData) -> void:
 
 func _perk_name(p: String) -> String:
 	return {"tough": "Крепыш", "industrious": "Трудяга", "genius": "Мудрец", "charmer": "Обаятельный", "swift": "Быстрый", "lucky": "Удачливый", "brave": "Смельчак", "curious": "Любопытный", "frugal": "Бережливый", "pious": "Благочестивый"}.get(p, p)
+
+
+func _item_name(p: String) -> String:
+	return {
+		"food": "еда", "wood": "дерево", "stone": "камень", "iron": "железо",
+		"gold": "золото", "goods": "товары", "spear": "копьё", "hammer": "молот",
+		"pickaxe": "кирка", "axe": "топор", "carcass": "туша", "fish": "рыба",
+		"cloth": "ткань", "tool": "инструмент", "flag": "флаг"
+	}.get(p, p)
 
 
 func _set_chip(p: PanelContainer, text: String, color: Color) -> void:
@@ -878,7 +893,8 @@ func action_icon_color(a: String) -> Color:
 		"drink": Color("#4aa8d8"), "sleep": Color("#7a7ad8"), "work": Color("#c8c8a0"),
 		"build": Color("#e0c060"), "socialize": Color("#e08ac8"), "pray": Color("#c8a8e0"),
 		"play": Color("#8ad8e0"), "flee": Color("#b06ad8"), "march": Color("#c85048"),
-		"gather": Color("#d8a04a"), "siege": Color("#c85048"), "explore": Color("#6ac8d8")
+		"gather": Color("#d8a04a"), "siege": Color("#c85048"), "explore": Color("#6ac8d8"),
+		"mine": Color("#9a9a8a"), "trade": Color("#d8c060"), "scavenge": Color("#b08a4a")
 	}.get(a, ThemeBuilder.MUTED)
 
 
@@ -1260,6 +1276,16 @@ func _build_world_tab() -> void:
 	panel_content.add_child(_info_row("mountain", L.t("mountain_word"), "%d%%" % int(100.0 * mountains / total)))
 	panel_content.add_child(_info_row("sand", L.t("desert_word"), "%d%%" % int(100.0 * desert / total)))
 	panel_content.add_child(_info_row("people", L.t("animals_count"), L.num(sim.animals.size())))
+	var ruins := 0
+	for s in sim.settlements:
+		if s.destroyed and not s.ruin_loot.is_empty():
+			ruins += 1
+	if not sim.ships.is_empty():
+		panel_content.add_child(_info_row("ship", "Корабли", str(sim.ships.size())))
+	if not sim.caravans.is_empty():
+		panel_content.add_child(_info_row("trade", "Караваны", str(sim.caravans.size())))
+	if ruins > 0:
+		panel_content.add_child(_info_row("ruin", "Руины с припасами", str(ruins)))
 	panel_content.add_child(_info_row("tree", L.t("trees_count"), L.num(game.nature_view.tree_count())))
 	panel_content.add_child(_hairline())
 	panel_content.add_child(_lbl(L.t("top_settlements"), "Small", ThemeBuilder.TEAL, 11))
@@ -1332,6 +1358,39 @@ func _build_world_tab() -> void:
 	threat_row.add_child(th3)
 	panel_content.add_child(threat_row)
 	world_sig = "%d_%d_%d_%d" % [sim.year, sim.total_population, sim.settlements.size(), sim.animals.size()]
+
+
+func open_perk_dialog(a: AgentData) -> void:
+	_open_modal("Перки — " + a.display_name(), "perks")
+	var info := _lbl("Отметьте перки. Изменения применяются сразу и сохраняются.", "Small", ThemeBuilder.MUTED, 11)
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD
+	modal_content.add_child(info)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 4)
+	for pk in AgentData.ALL_PERKS:
+		var cb := CheckButton.new()
+		cb.text = _perk_name(pk)
+		cb.button_pressed = a.perks.has(pk)
+		cb.toggled.connect(func(on): perk_toggled.emit(a.id, pk, on))
+		grid.add_child(cb)
+	modal_content.add_child(grid)
+	modal_content.add_child(_hairline())
+	var imm := CheckButton.new()
+	imm.text = "Бессмертие (не стареет)"
+	imm.button_pressed = a.immortal
+	imm.toggled.connect(func(on): immortal_toggled.emit(a.id, on))
+	modal_content.add_child(imm)
+	var clear := _button("Снять все перки", "GhostButton")
+	clear.pressed.connect(func():
+		for pk2 in AgentData.ALL_PERKS:
+			perk_toggled.emit(a.id, pk2, false)
+	)
+	modal_content.add_child(clear)
+	var close := _button("Готово", "GoldButton")
+	close.pressed.connect(close_modal)
+	modal_content.add_child(close)
 
 
 func open_spawn_dialog(kind: String) -> void:

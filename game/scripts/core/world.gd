@@ -8,7 +8,7 @@ signal biomes_changed(rect: Rect2i)
 signal water_changed(rect: Rect2i)
 
 const CELL := 2.0
-const HEIGHT_SCALE := 86.0
+const HEIGHT_SCALE := 64.0
 const SEA_DEFAULT := 0.40
 const DAYS_PER_YEAR := 365
 
@@ -251,11 +251,13 @@ func _generate_heights(preset: Dictionary) -> void:
 			var d := Vector2(nx - 0.5, nz - 0.5).length() * 2.0
 			var falloff := 1.0 - smoothstep(0.62, 1.28, d)
 			var h := cont * 0.62 + falloff * 0.56 - 0.30
-			# горные хребты
+			# горные хребты: редкие пояса, а не холмы каждые несколько метров
 			var ridge := (_noise2.get_noise_2d(x + wx * 0.5, z + wz * 0.5) + 1.0) * 0.5
-			ridge = pow(clampf(ridge, 0.0, 1.0), 2.1)
-			var mountain_mask := smoothstep(0.45, 0.78, cont) * smoothstep(0.05, 0.35, falloff)
-			h += ridge * 0.42 * mountain_mask * mountain_amt
+			ridge = pow(clampf(ridge, 0.0, 1.0), 1.7)
+			var belt := (_noise.get_noise_2d(x * 0.6 + 5000.0, z * 0.6 + 5000.0) + 1.0) * 0.5
+			var mountain_mask := smoothstep(0.66, 0.84, belt) * smoothstep(0.30, 0.58, cont) * smoothstep(0.05, 0.35, falloff)
+			h += ridge * 0.26 * mountain_mask * mountain_amt
+			h += _noise3.get_noise_2d(x, z) * 0.010 * mountain_mask
 			# мелкая детализация
 			h += _noise3.get_noise_2d(x, z) * 0.012
 			# крупные равнины и речные низины: низкочастотная маска сглаживает рельеф
@@ -826,8 +828,41 @@ func _reclassify_cell(x: int, z: int) -> void:
 
 # ------------------------------------------------------------------ queries
 
-func add_clearing(center: Vector2i, radius: float) -> void:
-	clearings.append({"c": center, "r": radius})
+func flatten_area(center: Vector2i, radius: int, strength: float = 0.8) -> Rect2i:
+	var x0 := maxi(1, center.x - radius)
+	var z0 := maxi(1, center.y - radius)
+	var x1 := mini(size - 2, center.x + radius)
+	var z1 := mini(size - 2, center.y + radius)
+	if x0 >= x1 or z0 >= z1:
+		return Rect2i(center, Vector2i.ZERO)
+	# цель — средняя высота площадки
+	var sum := 0.0
+	var cnt := 0
+	for z in range(z0, z1 + 1):
+		for x in range(x0, x1 + 1):
+			sum += heights[idx(x, z)]
+			cnt += 1
+	var target := sum / maxf(1.0, float(cnt))
+	var r := float(maxi(1, radius))
+	for z in range(z0, z1 + 1):
+		for x in range(x0, x1 + 1):
+			var d := Vector2(x - center.x, z - center.y).length()
+			if d > r:
+				continue
+			var fall := 1.0 - smoothstep(r * 0.55, r, d)
+			var i := idx(x, z)
+			heights[i] = clampf(lerpf(heights[i], target, strength * fall), 0.0, 1.0)
+			_update_water_after_height(i)
+			_reclassify_cell(x, z)
+	var rect := Rect2i(x0, z0, x1 - x0 + 1, z1 - z0 + 1)
+	_refresh_climate(rect)
+	terrain_changed.emit(rect)
+	biomes_changed.emit(rect)
+	water_changed.emit(rect)
+	return rect
+
+
+func add_clearing(center: Vector2i, radius: float) -> void:	clearings.append({"c": center, "r": radius})
 
 
 func is_cleared(x: int, z: int) -> bool:

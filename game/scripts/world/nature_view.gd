@@ -24,6 +24,7 @@ var bio_flower := PackedByteArray()
 var bio_mushroom := PackedByteArray()
 var defer_until_ms := 0
 var last_frame_us := 0
+var lod_level := 0
 
 
 func setup(p_world: WorldModel) -> void:
@@ -71,6 +72,17 @@ func mark_dirty_rect(rect: Rect2i) -> void:
 	for cz in range(c0.y, c1.y + 1):
 		for cx in range(c0.x, c1.x + 1):
 			dirty_chunks[Vector2i(cx, cz)] = true
+
+
+func set_lod(level: int) -> void:
+	if level == lod_level:
+		return
+	lod_level = level
+	var small := ["MM_bush", "MM_flowers", "MM_mushroom", "MM_rock"]
+	for root in chunks.values():
+		for c in root.get_children():
+			if c is MultiMeshInstance3D and str(c.name) in small:
+				c.visible = level < 2
 
 
 func _process(_delta: float) -> void:
@@ -207,6 +219,8 @@ func _rebuild_chunk(key: Vector2i) -> void:
 		mmi.material_override = MeshKit.vertex_material()
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		mmi.visibility_range_end = 700.0
+		if lod_level >= 2 and t in ["bush", "flowers", "mushroom", "rock"]:
+			mmi.visible = false
 		root.add_child(mmi)
 
 
