@@ -227,6 +227,8 @@ func _create_hud() -> void:
 	hud.god_agent_action.connect(_on_god_agent_action)
 	hud.favourite_toggled.connect(_on_favourite_toggled)
 	hud.spawn_requested.connect(_on_spawn_requested)
+	hud.inspect_agent_requested.connect(_on_inspect_agent_requested)
+	hud.spawn_monster_requested.connect(_on_spawn_monster_requested)
 	hud.server_settings_changed.connect(_on_settings_changed)
 	hud.set_speed(speed)
 	hud.update_essence(essence, sandbox)
@@ -303,6 +305,41 @@ func _on_god_agent_action(kind: String) -> void:
 	refresh_inspector_force()
 
 
+func _on_spawn_monster_requested(kind: String) -> void:
+	var cell := hud.last_hover_cell
+	if cell.x < 0 or not world.in_bounds(cell.x, cell.y):
+		var s0 := get_selected_settlement()
+		cell = s0.center if s0 != null else Vector2i(world.size / 2, world.size / 2)
+	if not world.is_land_cell(cell.x, cell.y):
+		for r in range(1, 10):
+			var found := false
+			for dz in range(-r, r + 1):
+				for dx in range(-r, r + 1):
+					if world.is_land_cell(cell.x + dx, cell.y + dz):
+						cell = Vector2i(cell.x + dx, cell.y + dz)
+						found = true
+						break
+				if found: break
+			if found: break
+	var m := sim._spawn_monster(kind, cell)
+	hud.toast("Призвано: %s" % str(m.get("name", kind)), "monster")
+	camera_rig.focus_cell(Vector2(cell), 30.0)
+	refresh_inspector_force()
+
+
+func _on_inspect_agent_requested(id: int) -> void:
+	var a: AgentData = sim.agent_by_id.get(id, null)
+	if a == null or not a.alive:
+		return
+	selected_agent_id = a.id
+	selected_settlement_id = -1
+	sim.selected_settlement_id = -1
+	creature_view.set_selected(a.id)
+	settlement_view.select(-1)
+	camera_rig.focus_cell(Vector2(a.pos), 26.0)
+	hud.inspect_agent(a)
+
+
 func _on_favourite_toggled(id: int) -> void:
 	var a: AgentData = sim.agent_by_id.get(id, null)
 	if a == null:
@@ -375,6 +412,7 @@ func _process(delta: float) -> void:
 		terrain_view.skip_budget = false
 	if creature_view != null:
 		creature_view.skip_sync = false
+		creature_view.set_focus(world.world_to_cell(camera_rig.target))
 	play_seconds += delta
 	if hud != null and hud.is_modal_open():
 		pass
@@ -391,6 +429,7 @@ func _process(delta: float) -> void:
 			essence = minf(ESSENCE_MAX, essence + delta * 0.65)
 		_move_agents(delta)
 		_move_animals(delta)
+		_move_monsters(delta)
 		autosave_timer -= delta
 		if autosave_timer <= 0.0:
 			autosave_timer = 180.0
@@ -502,6 +541,9 @@ func _move_agents(delta: float) -> void:
 		var a: AgentData = av
 		if not a.alive:
 			continue
+		if creature_view != null and creature_view.focus_cell.x >= 0.0 and a.pos.distance_to(creature_view.focus_cell) > 160.0:
+			if (Engine.get_process_frames() + a.id) % 3 != 0:
+				continue
 		# охота: цель — животное, при сближении — добыча
 		if a.action == "hunt":
 			var an: Dictionary = sim.animal_by_id.get(a.hunting_id, {})
@@ -517,6 +559,16 @@ func _move_agents(delta: float) -> void:
 			if a.pos.distance_to(a.target) < 1.2:
 				sim.complete_haul(a)
 				continue
+		elif a.action == "fight":
+			var mon: Dictionary = {}
+			for mm in sim.monsters:
+				if int(mm.id) == a.hunting_id and bool(mm.get("alive", true)):
+					mon = mm
+					break
+			if mon.is_empty():
+				a.action_time = a.action_duration
+			else:
+				a.target = mon.pos
 		elif a.action == "flee" and a.pos.distance_to(a.target) < 0.6:
 			a.action_time = a.action_duration
 		var to: Vector2 = a.target - a.pos
@@ -524,7 +576,7 @@ func _move_agents(delta: float) -> void:
 		if d < 0.08:
 			continue
 		var spd := a.speed * 0.42 * mult
-		if a.action == "flee" or a.action == "hunt":
+		if a.action == "flee" or a.action == "hunt" or a.action == "fight":
 			spd *= 1.35
 		elif a.action == "sleep":
 			spd *= 0.5
@@ -539,6 +591,21 @@ func _move_agents(delta: float) -> void:
 			step *= 0.45
 			next = a.pos + (to / d) * minf(step, d)
 		a.pos = Vector2(clampf(next.x, 0.5, world.size - 1.5), clampf(next.y, 0.5, world.size - 1.5))
+
+
+func _move_monsters(delta: float) -> void:
+	var mult := 1.0 + speed * 0.10
+	for m in sim.monsters:
+		if not bool(m.get("alive", true)):
+			continue
+		var p: Vector2 = m.pos
+		var t: Vector2 = m.target
+		var to := t - p
+		var d := to.length()
+		if d < 0.5:
+			continue
+		var step := float(m.get("speed", 1.0)) * 0.35 * mult * delta
+		m.pos = p + (to / d) * minf(step, d)
 
 
 func _move_animals(delta: float) -> void:
